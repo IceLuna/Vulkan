@@ -1,0 +1,7 @@
+﻿  Renderer.cpp
+  Generating code
+  61 of 1136 functions ( 5.4%) were compiled, the rest were copied from previous compilation.
+    10 functions were new in current compilation
+    7 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  Vulkan.vcxproj -> C:\dev\Vulkan\x64\Release\Vulkan.exe
