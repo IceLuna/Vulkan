@@ -5,6 +5,7 @@
 #include <vulkan/vulkan_win32.h>
 #include <iostream>
 #include <vector>
+#include <array>
 #include <set>
 #include <optional>
 #include <cstdint> // Necessary for UINT32_MAX
@@ -20,6 +21,8 @@
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
+
+#include <glm/glm.hpp>
 
 const std::vector<const char*> s_DeviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -71,6 +74,62 @@ struct VulkanData
 	std::vector<VkSemaphore> RenderFinishedSemaphores;
 	std::vector<VkFence> InFlightFences;
 	std::vector<VkFence> InFlightImages;
+	VkBuffer VertexBuffer;
+	VkBuffer IndexBuffer;
+	VkDeviceMemory VertexBufferMemory;
+	VkDeviceMemory IndexBufferMemory;
+	VkBuffer VBStagingBuffer;
+	VkDeviceMemory VBStagingBufferMemory;
+};
+
+struct Vertex
+{
+	glm::vec2 Position = glm::vec2(0.f);
+	glm::vec3 Color = glm::vec3(0.f);
+
+	static VkVertexInputBindingDescription GetBindingDescription()
+	{
+		// @InputRate
+		//		VK_VERTEX_INPUT_RATE_VERTEX: Move to the next data entry after each vertex
+		//		VK_VERTEX_INPUT_RATE_INSTANCE : Move to the next data entry after each instance
+		VkVertexInputBindingDescription desc{};
+		desc.binding = 0;
+		desc.stride = sizeof(Vertex);
+		desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		return desc;
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDesctiption()
+	{
+		std::array<VkVertexInputAttributeDescription, 2> attribs{};
+
+		attribs[0].binding = 0;
+		attribs[0].location = 0;
+		attribs[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attribs[0].offset = offsetof(Vertex, Position);
+
+		attribs[1].binding = 0;
+		attribs[1].location = 1;
+		attribs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attribs[1].offset = offsetof(Vertex, Color);
+
+		return attribs;
+	}
+};
+
+static std::vector<Vertex> vertices =
+{
+	{ { -0.5f, -0.5f }, { 1.f, 1.f, 1.f } },
+	{ {  0.5f, -0.5f }, { 1.f, 0.f, 0.f } },
+	{ {  0.5f,  0.5f }, { 0.f, 1.f, 0.f } },
+	{ { -0.5f,  0.5f }, { 0.f, 0.f, 1.f } }
+};
+
+static std::vector<uint32_t> indices =
+{
+	0, 1, 2,
+	2, 3, 0
 };
 
 static VulkanData s_Data;
@@ -579,6 +638,8 @@ static void CreateGraphicsPipeline()
 
 	VkShaderModule vertShader = CreateShaderModule(vertCode);
 	VkShaderModule fragShader = CreateShaderModule(fragCode);
+	VkVertexInputBindingDescription bindingDesc = Vertex::GetBindingDescription();
+	std::array<VkVertexInputAttributeDescription, 2> attribDescs = Vertex::GetAttributeDesctiption();
 
 	VkPipelineShaderStageCreateInfo vertCreateInfo{};
 	vertCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -596,10 +657,10 @@ static void CreateGraphicsPipeline()
 
 	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo{};
 	vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-	vertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
-	vertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
+	vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+	vertexInputCreateInfo.pVertexBindingDescriptions = &bindingDesc;
+	vertexInputCreateInfo.vertexAttributeDescriptionCount = (uint32_t)attribDescs.size();
+	vertexInputCreateInfo.pVertexAttributeDescriptions = attribDescs.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo{};
 	inputAssemblyCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -813,6 +874,54 @@ static void CreateCommandPool()
 	}
 }
 
+static void PrepareCommandBuffers()
+{
+	size_t buffersCount = s_Data.SwapChainFramebuffers.size();
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+	beginInfo.pInheritanceInfo = nullptr;
+
+	VkClearValue clearColor = { 0.f, 0.f, 0.f, 1.f };
+	VkRenderPassBeginInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = s_Data.RenderPass;
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = s_Data.SwapChainExtent;
+	renderPassInfo.clearValueCount = 1;
+	renderPassInfo.pClearValues = &clearColor;
+
+	VkBuffer vertexBuffers[] = { s_Data.VertexBuffer };
+	VkDeviceSize offsets[] = { 0 };
+
+	//Read the end of: https://vulkan-tutorial.com/Vertex_buffers/Index_buffer
+
+	for (size_t i = 0; i < buffersCount; ++i)
+	{
+		if (vkBeginCommandBuffer(s_Data.CommandBuffers[i], &beginInfo) != VK_SUCCESS)
+		{
+			std::cerr << "Failed to begin command buffer!\n";
+			exit(-1);
+		}
+
+		renderPassInfo.framebuffer = s_Data.SwapChainFramebuffers[i];
+
+		vkCmdBeginRenderPass(s_Data.CommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBindPipeline(s_Data.CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, s_Data.Pipeline);
+		vkCmdBindVertexBuffers(s_Data.CommandBuffers[i], 0, 1, vertexBuffers, offsets);
+		vkCmdBindIndexBuffer(s_Data.CommandBuffers[i], s_Data.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(s_Data.CommandBuffers[i], indices.size(), 1, 0, 0, 0);
+		vkCmdEndRenderPass(s_Data.CommandBuffers[i]);
+
+		if (vkEndCommandBuffer(s_Data.CommandBuffers[i]) != VK_SUCCESS)
+		{
+			std::cerr << "Failed to end command buffer!\n";
+			exit(-1);
+		}
+	}
+}
+
 static void CreateCommandBuffers()
 {
 	size_t buffersCount = s_Data.SwapChainFramebuffers.size();
@@ -829,6 +938,8 @@ static void CreateCommandBuffers()
 		std::cerr << "Failed to allocate command buffers!\n";
 		exit(-1);
 	}
+
+	PrepareCommandBuffers();
 }
 
 static void CreateSyncObjects()
@@ -853,47 +964,6 @@ static void CreateSyncObjects()
 			std::cerr << "Failed to sync objects!\n";
 			exit(-1);
 		}
-}
-
-static void PrepareCommandBuffers()
-{
-	size_t buffersCount = s_Data.SwapChainFramebuffers.size();
-
-	VkCommandBufferBeginInfo beginInfo{};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-	beginInfo.pInheritanceInfo = nullptr;
-
-	VkClearValue clearColor = { 0.f, 0.f, 0.f, 1.f };
-	VkRenderPassBeginInfo renderPassInfo{};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassInfo.renderPass = s_Data.RenderPass;
-	renderPassInfo.renderArea.offset = { 0, 0 };
-	renderPassInfo.renderArea.extent = s_Data.SwapChainExtent;
-	renderPassInfo.clearValueCount = 1;
-	renderPassInfo.pClearValues = &clearColor;
-
-	for (size_t i = 0; i < buffersCount; ++i)
-	{
-		if (vkBeginCommandBuffer(s_Data.CommandBuffers[i], &beginInfo) != VK_SUCCESS)
-		{
-			std::cerr << "Failed to begin command buffer!\n";
-			exit(-1);
-		}
-
-		renderPassInfo.framebuffer = s_Data.SwapChainFramebuffers[i];
-
-		vkCmdBeginRenderPass(s_Data.CommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(s_Data.CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, s_Data.Pipeline);
-		vkCmdDraw(s_Data.CommandBuffers[i], 3, 1, 0, 0);
-		vkCmdEndRenderPass(s_Data.CommandBuffers[i]);
-
-		if (vkEndCommandBuffer(s_Data.CommandBuffers[i]) != VK_SUCCESS)
-		{
-			std::cerr << "Failed to end command buffer!\n";
-			exit(-1);
-		}
-	}
 }
 
 static void CleanupSwapChain()
@@ -928,9 +998,66 @@ static void RecreateSwapChain()
 	PrepareCommandBuffers();
 }
 
+static void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+{
+	// TODO: Different command pool for these kind of operations. See: https://vulkan-tutorial.com/Vertex_buffers/Staging_buffer
+
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool = s_Data.CommandPool;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer cmdBuffer;
+	vkAllocateCommandBuffers(s_Data.Device, &allocInfo, &cmdBuffer);
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	VkBufferCopy copyRegion{};
+	copyRegion.dstOffset = 0;
+	copyRegion.srcOffset = 0;
+	copyRegion.size = size;
+
+	vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+	vkCmdCopyBuffer(cmdBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+	vkEndCommandBuffer(cmdBuffer);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmdBuffer;
+
+	// TODO: Use fences to wait. 
+	// A fence would allow you to schedule multiple transfers simultaneously and
+	// wait for all of them complete, instead of executing one at a time.
+	// That may give the driver more opportunities to optimize.
+	vkQueueSubmit(s_Data.GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(s_Data.GraphicsQueue);
+	vkFreeCommandBuffers(s_Data.Device, s_Data.CommandPool, 1, &cmdBuffer);
+}
+
+static void UpdateVertexBuffer()
+{
+	uint64_t size = sizeof(Vertex) * vertices.size();
+	float newColor = (float)pow(sin(glfwGetTime()), 2);
+	vertices[0].Color.r = newColor;
+	vertices[1].Color.g = newColor;
+	vertices[2].Color.b = newColor;
+
+	void* data = nullptr;
+	vkMapMemory(s_Data.Device, s_Data.VBStagingBufferMemory, 0, size, 0, &data);
+	memcpy(data, vertices.data(), size);
+	vkUnmapMemory(s_Data.Device, s_Data.VBStagingBufferMemory);
+
+	CopyBuffer(s_Data.VBStagingBuffer, s_Data.VertexBuffer, size);
+}
+
 void Renderer::DrawFrame()
 {
 	currentFrame = (currentFrame + 1) % s_MaxFramesInFlight;
+	UpdateVertexBuffer();
 	vkWaitForFences(s_Data.Device, 1, &s_Data.InFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
 	uint32_t imageIndex;
@@ -1250,6 +1377,90 @@ static void InitImGui()
 		s_ImGuiCommandBuffers[i] = CreateSecondaryCommandBuffer();
 }
 
+static uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propFlags)
+{
+	VkPhysicalDeviceMemoryProperties memProps;
+	vkGetPhysicalDeviceMemoryProperties(s_Data.PhysicalDevice, &memProps);
+
+	for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+	{
+		if ((typeFilter & (1 << i)) && (memProps.memoryTypes[i].propertyFlags & propFlags) == propFlags)
+			return i;
+	}
+
+	std::cerr << "Failed to find required memory type!\n";
+	exit(-1);
+	return 0;
+}
+
+static void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags propFlags, VkBuffer& outBuffer, VkDeviceMemory& outBufferMemory)
+{
+	VkBufferCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.size = size;
+	createInfo.usage = usage;
+	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateBuffer(s_Data.Device, &createInfo, nullptr, &outBuffer) != VK_SUCCESS)
+	{
+		std::cerr << "Failed to create vertex buffer!\n";
+		exit(-1);
+	}
+
+	VkMemoryRequirements memRequirements{};
+	vkGetBufferMemoryRequirements(s_Data.Device, outBuffer, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, propFlags);
+
+	// It should be noted that in a real world application, you're not supposed to actually call vkAllocateMemory for every individual buffer
+	// Use this lib https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+	if (vkAllocateMemory(s_Data.Device, &allocInfo, nullptr, &outBufferMemory) != VK_SUCCESS)
+	{
+		std::cerr << "Failed to allocate memory\n";
+		exit(-1);
+	}
+
+	vkBindBufferMemory(s_Data.Device, outBuffer, outBufferMemory, 0);
+}
+
+static void CreateVertexBuffer()
+{
+	VkDeviceSize size = sizeof(Vertex) * vertices.size();
+
+	CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, s_Data.VBStagingBuffer, s_Data.VBStagingBufferMemory);
+
+	void* data = nullptr;
+	vkMapMemory(s_Data.Device, s_Data.VBStagingBufferMemory, 0, size, 0, &data);
+	memcpy(data, vertices.data(), size);
+	vkUnmapMemory(s_Data.Device, s_Data.VBStagingBufferMemory);
+
+	CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, s_Data.VertexBuffer, s_Data.VertexBufferMemory);
+	CopyBuffer(s_Data.VBStagingBuffer, s_Data.VertexBuffer, size);
+}
+
+static void CreateIndexBuffer()
+{
+	VkDeviceSize size = sizeof(uint32_t) * indices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void* data = nullptr;
+	vkMapMemory(s_Data.Device, stagingBufferMemory, 0, size, 0, &data);
+	memcpy(data, indices.data(), size);
+	vkUnmapMemory(s_Data.Device, stagingBufferMemory);
+
+	CreateBuffer(size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, s_Data.IndexBuffer, s_Data.IndexBufferMemory);
+	CopyBuffer(stagingBuffer, s_Data.IndexBuffer, size);
+
+	vkDestroyBuffer(s_Data.Device, stagingBuffer, nullptr);
+	vkFreeMemory(s_Data.Device, stagingBufferMemory, nullptr);
+}
+
 void Renderer::Init()
 {
 	#ifdef NDEBUG
@@ -1269,8 +1480,9 @@ void Renderer::Init()
 	CreateGraphicsPipeline(); //To add SPIR-V library see: https://github.com/google/shaderc
 	CreateFramebuffers();
 	CreateCommandPool();
+	CreateVertexBuffer();
+	CreateIndexBuffer();
 	CreateCommandBuffers();
-	PrepareCommandBuffers();
 	CreateSyncObjects();
 
 	InitImGui();
@@ -1287,6 +1499,13 @@ void Renderer::Shutdown()
 	vkDestroyDescriptorPool(s_Data.Device, s_ImGui_DescriptorPool, nullptr);
 
 	CleanupSwapChain();
+	vkDestroyBuffer(s_Data.Device, s_Data.VertexBuffer, nullptr);
+	vkFreeMemory(s_Data.Device, s_Data.VertexBufferMemory, nullptr);
+	vkDestroyBuffer(s_Data.Device, s_Data.IndexBuffer, nullptr);
+	vkFreeMemory(s_Data.Device, s_Data.IndexBufferMemory, nullptr);
+
+	vkDestroyBuffer(s_Data.Device, s_Data.VBStagingBuffer, nullptr);
+	vkFreeMemory(s_Data.Device, s_Data.VBStagingBufferMemory, nullptr);
 
 	for (uint32_t i = 0; i < s_MaxFramesInFlight; ++i)
 	{
