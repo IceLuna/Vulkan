@@ -26,10 +26,15 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 #include <chrono>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../stb_image.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../tiny_obj_loader.h"
 
 #define mEXIT(message) { std::cerr << message << std::endl; exit(-1); }
 
@@ -107,11 +112,18 @@ struct VulkanData
 	VkImageView DepthImageView;
 };
 
+static const char* s_ModelPath = "Models/viking_room.obj";
+static const char* s_TexturePath = "Textures/viking_room.png";
+
 struct Vertex
 {
 	glm::vec3 Position;
 	glm::vec3 Color;
 	glm::vec2 TexCoords;
+
+	bool operator==(const Vertex& other) const {
+		return Position == other.Position && Color == other.Color && TexCoords == other.TexCoords;
+	}
 
 	static VkVertexInputBindingDescription GetBindingDescription()
 	{
@@ -147,24 +159,18 @@ struct Vertex
 	}
 };
 
-static const std::vector<Vertex> vertices =
-{
-	{{ -0.5f, -0.5f, 0.f}, {1.0f, 1.0f, 1.0f}, {1.f, 0.f}},
-	{{  0.5f, -0.5f, 0.f}, {0.0f, 1.0f, 0.0f}, {0.f, 0.f}},
-	{{  0.5f,  0.5f, 0.f}, {0.0f, 0.0f, 1.0f}, {0.f, 1.f}},
-	{{ -0.5f,  0.5f, 0.f}, {1.0f, 1.0f, 1.0f}, {1.f, 1.f}},
+namespace std {
+	template<> struct hash<Vertex> {
+		size_t operator()(Vertex const& vertex) const {
+			return ((hash<glm::vec3>()(vertex.Position) ^
+				(hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^
+				(hash<glm::vec2>()(vertex.TexCoords) << 1);
+		}
+	};
+}
 
-	{{ -0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.f, 0.f}},
-	{{  0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.f, 0.f}},
-	{{  0.5f,  0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.f, 1.f}},
-	{{ -0.5f,  0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.f, 1.f}}
-};
-
-static const std::vector<uint32_t> indices =
-{
-	0, 1, 2, 2, 3, 0,
-	4, 5, 6, 6, 7, 4
-};
+static std::vector<Vertex> s_Vertices;
+static std::vector<uint32_t> s_Indices;
 
 struct UniformBufferObject
 {
@@ -1101,7 +1107,7 @@ static void CreateCommandBuffers()
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &s_Data.VertexBuffer, offsets);
 		vkCmdBindIndexBuffer(commandBuffer, s_Data.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, s_Data.PipelineLayout, 0, 1, &s_Data.DescriptorSets[i], 0, nullptr);
-		vkCmdDrawIndexed(commandBuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
+		vkCmdDrawIndexed(commandBuffer, (uint32_t)s_Indices.size(), 1, 0, 0, 0);
 		vkCmdEndRenderPass(commandBuffer);
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
 			mEXIT("Failed to end command buffer!");
@@ -1175,7 +1181,7 @@ static void CreateUniformBuffers()
 
 static void CreateVertexBuffer()
 {
-	VkDeviceSize size = vertices.size() * sizeof(Vertex);
+	VkDeviceSize size = s_Vertices.size() * sizeof(Vertex);
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
@@ -1184,7 +1190,7 @@ static void CreateVertexBuffer()
 
 	void* data = nullptr;
 	vkMapMemory(s_Data.Device, stagingBufferMemory, 0, size, 0, &data);
-	memcpy(data, vertices.data(), size);
+	memcpy(data, s_Vertices.data(), size);
 	vkUnmapMemory(s_Data.Device, stagingBufferMemory);
 
 	CopyBuffer(stagingBuffer, s_Data.VertexBuffer, size);
@@ -1195,7 +1201,7 @@ static void CreateVertexBuffer()
 
 static void CreateIndexBuffer()
 {
-	VkDeviceSize size = indices.size() * sizeof(uint32_t);
+	VkDeviceSize size = s_Indices.size() * sizeof(uint32_t);
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 
@@ -1204,7 +1210,7 @@ static void CreateIndexBuffer()
 
 	void* data = nullptr;
 	vkMapMemory(s_Data.Device, stagingBufferMemory, 0, size, 0, &data);
-	memcpy(data, indices.data(), size);
+	memcpy(data, s_Indices.data(), size);
 	vkUnmapMemory(s_Data.Device, stagingBufferMemory);
 
 	CopyBuffer(stagingBuffer, s_Data.IndexBuffer, size);
@@ -1334,9 +1340,9 @@ static void CreateDescriptorSets()
 static void CreateTextureImage()
 {
 	int w, h, channels;
-	stbi_uc* imageData = stbi_load("Textures/pika.png", &w, &h, &channels, 4);
+	stbi_uc* imageData = stbi_load(s_TexturePath, &w, &h, &channels, 4);
 
-	VkDeviceSize size = (size_t)w * h * channels;
+	VkDeviceSize size = (size_t)w * h * 4;
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 	CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, stagingBuffer, stagingBufferMemory);
@@ -1346,12 +1352,13 @@ static void CreateTextureImage()
 	vkUnmapMemory(s_Data.Device, stagingBufferMemory);
 
 	stbi_image_free(imageData);
+	VkFormat textureFormat = VK_FORMAT_R8G8B8A8_SRGB;
 
-	CreateImage((uint32_t)w, (uint32_t)h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+	CreateImage((uint32_t)w, (uint32_t)h, textureFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, s_Data.TextureImage, s_Data.TextureImageMemory);
-	TransitionImageLayout(s_Data.TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	TransitionImageLayout(s_Data.TextureImage, textureFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	CopyBufferToImage(stagingBuffer, s_Data.TextureImage, (uint32_t)w, (uint32_t)h);
-	TransitionImageLayout(s_Data.TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	TransitionImageLayout(s_Data.TextureImage, textureFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	vkDestroyBuffer(s_Data.Device, stagingBuffer, nullptr);
 	vkFreeMemory(s_Data.Device, stagingBufferMemory, nullptr);
@@ -1419,6 +1426,48 @@ static void RecreateSwapchain()
 	CreateCommandBuffers();
 }
 
+static void LoadModel()
+{
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string warn, err;
+
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, s_ModelPath))
+		mEXIT("Failed to load the model!");
+	
+	s_Vertices.reserve(shapes.size() * 2);
+	s_Indices.reserve(shapes.size() * 2);
+
+	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+	for (const auto& shape : shapes)
+		for (const auto& index : shape.mesh.indices)
+		{
+			Vertex vertex{};
+
+			vertex.Position = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			vertex.TexCoords = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+
+			vertex.Color = { 1.0f, 1.0f, 1.0f };
+
+			if (uniqueVertices.count(vertex) == 0) {
+				uniqueVertices[vertex] = static_cast<uint32_t>(s_Vertices.size());
+				s_Vertices.push_back(vertex);
+			}
+
+			s_Indices.push_back(uniqueVertices[vertex]);
+		}
+}
+
 void Renderer::Init()
 {
 	#ifdef NDEBUG
@@ -1443,6 +1492,7 @@ void Renderer::Init()
 	CreateTextureImage();
 	CreateTextureImageView();
 	CreateTextureSampler();
+	LoadModel();
 	CreateVertexBuffer();
 	CreateIndexBuffer();
 	CreateUniformBuffers();
