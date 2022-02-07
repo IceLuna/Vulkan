@@ -7,7 +7,6 @@ public:
 	static void Shutdown();
 	static void DrawFrame();
 	static void OnWindowResized();
-
 	static void BeginImGui();
 	static void EndImGui();
 };
