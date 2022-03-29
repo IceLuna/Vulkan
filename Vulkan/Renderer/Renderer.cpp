@@ -117,6 +117,12 @@ struct VulkanData
 	VkImageView ColorImageView;
 };
 
+struct ImGuiData
+{
+	VkDescriptorPool DescriptorPool;
+	std::vector<VkCommandBuffer> CommandBuffers;
+};
+
 static const char* s_ModelPath = "Models/viking_room.obj";
 static const char* s_TexturePath = "Textures/viking_room.png";
 
@@ -185,8 +191,9 @@ struct UniformBufferObject
 };
 
 static VulkanData s_Data{};
+static ImGuiData s_ImGui{};
 static bool s_EnableValidationLayers = false;
-const int MAX_FRAMES_IN_FLIGHT = 2;
+const int MAX_FRAMES_IN_FLIGHT = 3;
 static uint32_t s_CurrentFrame = 0;
 
 static std::vector<char> ReadFile(const std::filesystem::path& path)
@@ -421,6 +428,22 @@ static VkCommandBuffer CreateSingleTimeCommandBuffer()
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
 	vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+
+	return cmdBuffer;
+}
+
+static VkCommandBuffer CreateSecondaryCommandBuffer()
+{
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = s_Data.CommandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer cmdBuffer;
+
+	if (vkAllocateCommandBuffers(s_Data.Device, &allocInfo, &cmdBuffer) != VK_SUCCESS)
+		mEXIT("Failed to allocate a single time command buffer!");
 
 	return cmdBuffer;
 }
@@ -756,7 +779,7 @@ static SwapchainSupportDetails QuerySwapchainSupport(VkPhysicalDevice device)
 static VkSurfaceFormatKHR ChooseSwapchainFormat(const std::vector<VkSurfaceFormatKHR>& availFormats)
 {
 	for (auto& format : availFormats)
-		if (format.format == VK_FORMAT_R8G8B8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			return format;
 
 	return availFormats[0];
@@ -1549,6 +1572,8 @@ static void CreateColorResources()
 	s_Data.ColorImageView = CreateImageView(s_Data.ColorImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 
+static void InitImGui();
+
 static void RecreateSwapchain()
 {
 	vkDeviceWaitIdle(s_Data.Device);
@@ -1748,9 +1773,10 @@ void Renderer::EndImGui()
 	vkDeviceWaitIdle(s_Data.Device);
 	ImGui::Render();
 
-	VkClearValue clearValues[2];
+	VkClearValue clearValues[3];
 	clearValues[0].color = { {0.f, 0.f, 0.f, 1.0f} };
 	clearValues[1].depthStencil = { 1.0f, 0 };
+	clearValues[2].color = { {0.f, 0.f, 0.f, 1.0f} };
 
 	uint32_t width = s_Data.SwapchainExtent.width;
 	uint32_t height = s_Data.SwapchainExtent.height;
@@ -1887,7 +1913,7 @@ static void InitImGui()
 	pool_info.maxSets = 100 * IM_ARRAYSIZE(pool_sizes);
 	pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
 	pool_info.pPoolSizes = pool_sizes;
-	//vkCreateDescriptorPool(device, &pool_info, nullptr, &s_ImGui_DescriptorPool);
+	vkCreateDescriptorPool(device, &pool_info, nullptr, &s_ImGui.DescriptorPool);
 
 	// Setup Platform/Renderer bindings
 	ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -1898,7 +1924,7 @@ static void InitImGui()
 	init_info.QueueFamily = s_Data.FamilyIndices.GraphicsQueue.value();
 	init_info.Queue = s_Data.GraphicsQueue;
 	init_info.PipelineCache = nullptr;
-	//init_info.DescriptorPool = s_ImGui_DescriptorPool;
+	init_info.DescriptorPool = s_ImGui.DescriptorPool;
 	init_info.Allocator = nullptr;
 	init_info.MinImageCount = 2;
 	init_info.ImageCount = (uint32_t)s_Data.SwapchainImages.size();
@@ -1908,16 +1934,16 @@ static void InitImGui()
 	{
 		// Use any command queue
 
-		//VkCommandBuffer commandBuffer = GetCommandBuffer(true);
-		//ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-		//FlushCommandBuffer(commandBuffer, s_Data.GraphicsQueue);
+		VkCommandBuffer commandBuffer = CreateSingleTimeCommandBuffer();
+		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+		EndCommandBuffer(commandBuffer);
 
 		vkDeviceWaitIdle(device);
 		ImGui_ImplVulkan_DestroyFontUploadObjects();
 	}
 
-	//s_ImGuiCommandBuffers.resize(s_MaxFramesInFlight);
-	//for (uint32_t i = 0; i < s_MaxFramesInFlight; i++)
-	//	s_ImGuiCommandBuffers[i] = CreateSecondaryCommandBuffer();
+	s_ImGui.CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		s_ImGui.CommandBuffers[i] = CreateSecondaryCommandBuffer();
 }
 
