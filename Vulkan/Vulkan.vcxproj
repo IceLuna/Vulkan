@@ -63,7 +63,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)vendor\GLFW;C:\VulkanSDK\1.3.204.1\Lib;</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;shaderc_sharedd.lib;shaderc_utild.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib;spirv-toolsd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -84,7 +84,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)vendor\GLFW;C:\VulkanSDK\1.3.204.1\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;shaderc_shared.lib;shaderc_util.lib;spirv-cross-core.lib;spirv-cross-glsl.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>
@@ -97,9 +97,20 @@
     <ClCompile Include="..\vendor\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\vendor\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Core\Application.cpp" />
+    <ClCompile Include="Core\FileSystem.cpp" />
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="Vulkan\VulkanAllocator.cpp" />
+    <ClCompile Include="Vulkan\VulkanCommandManager.cpp" />
+    <ClCompile Include="Vulkan\VulkanContext.cpp" />
+    <ClCompile Include="Vulkan\VulkanDevice.cpp" />
+    <ClCompile Include="Vulkan\VulkanGraphicsPipeline.cpp" />
+    <ClCompile Include="Vulkan\VulkanImage.cpp" />
+    <ClCompile Include="Vulkan\VulkanMemoryAllocator\vk_mem_alloc.cpp" />
+    <ClCompile Include="Vulkan\VulkanPipelineCache.cpp" />
+    <ClCompile Include="Vulkan\VulkanShader.cpp" />
+    <ClCompile Include="Vulkan\VulkanSwapchain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\vendor\imgui\backends\imgui_impl_glfw.h" />
@@ -111,10 +122,27 @@
     <ClInclude Include="..\vendor\imgui\imstb_textedit.h" />
     <ClInclude Include="..\vendor\imgui\imstb_truetype.h" />
     <ClInclude Include="Core\Application.h" />
+    <ClInclude Include="Core\DataBuffer.h" />
+    <ClInclude Include="Core\EnumUtils.h" />
+    <ClInclude Include="Core\FileSystem.h" />
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="tiny_obj_loader.h" />
+    <ClInclude Include="Vulkan\Vulkan.h" />
+    <ClInclude Include="Vulkan\VulkanAllocator.h" />
+    <ClInclude Include="Vulkan\VulkanCommandManager.h" />
+    <ClInclude Include="Vulkan\VulkanContext.h" />
+    <ClInclude Include="Vulkan\VulkanDevice.h" />
+    <ClInclude Include="Vulkan\VulkanFence.h" />
+    <ClInclude Include="Vulkan\VulkanGraphicsPipeline.h" />
+    <ClInclude Include="Vulkan\VulkanImage.h" />
+    <ClInclude Include="Vulkan\VulkanMemoryAllocator\vk_mem_alloc.h" />
+    <ClInclude Include="Vulkan\VulkanPipelineCache.h" />
+    <ClInclude Include="Vulkan\VulkanSemaphore.h" />
+    <ClInclude Include="Vulkan\VulkanShader.h" />
+    <ClInclude Include="Vulkan\VulkanSwapchain.h" />
+    <ClInclude Include="Vulkan\VulkanUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\basic.frag" />

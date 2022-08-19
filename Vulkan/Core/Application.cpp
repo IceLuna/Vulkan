@@ -5,6 +5,8 @@
 #include "imgui/backends/imgui_impl_glfw.h"
 #include "imgui/backends/imgui_impl_vulkan.h"
 
+#include "../Vulkan/VulkanContext.h"
+
 #include <iostream>
 #include <chrono>
 
@@ -25,7 +27,9 @@ Application::Application(uint32_t width, uint32_t height, const std::string& tit
         }
     };
     m_Window.SetResizeCallback(func);
-    Renderer::Init();
+    m_Window.InitContext();
+
+    Renderer::Init(width, height);
 }
 
 Application::~Application()
