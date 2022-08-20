@@ -1,6 +1,7 @@
 #include "VulkanCommandManager.h"
 #include "VulkanContext.h"
 #include "VulkanGraphicsPipeline.h"
+#include "VulkanFramebuffer.h"
 
 static uint32_t SelectQueueFamilyIndex(CommandQueueFamily queueFamily, const QueueFamilyIndices& indices)
 {
@@ -87,7 +88,7 @@ void VulkanCommandManager::Submit(const VulkanCommandBuffer* cmdBuffers, uint32_
 	info.pSignalSemaphores = vkSignalSemaphores.data();
 	info.pWaitDstStageMask = vkDstStageMask.data();
 
-	VK_CHECK(vkQueueSubmit(m_Queue, 1, &info, signalFence->GetVulkanFence()));
+	VK_CHECK(vkQueueSubmit(m_Queue, 1, &info, signalFence ? signalFence->GetVulkanFence() : VK_NULL_HANDLE));
 }
 
 //------------------
@@ -128,7 +129,7 @@ void VulkanCommandBuffer::End()
 	vkEndCommandBuffer(m_CommandBuffer);
 }
 
-void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline, uint32_t frameIndex)
+void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline)
 {
 	auto& state = pipeline.GetState();
 	m_CurrentGraphicsPipeline = &pipeline;
@@ -159,7 +160,7 @@ void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline, 
 	VkRenderPassBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	beginInfo.renderPass = pipeline.m_RenderPass;
-	beginInfo.framebuffer = pipeline.m_Framebuffers[frameIndex];
+	beginInfo.framebuffer = pipeline.m_Framebuffer;
 	beginInfo.clearValueCount = uint32_t(clearValues.size());
 	beginInfo.pClearValues = clearValues.data();
 	beginInfo.renderArea.extent = { pipeline.m_Width, pipeline.m_Height };
@@ -177,6 +178,57 @@ void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline, 
 	vkCmdSetScissor(m_CommandBuffer, 0, 1, &scissor);
 
 	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.m_GraphicsPipeline);
+}
+
+void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer)
+{
+	auto& state = pipeline.GetState();
+	m_CurrentGraphicsPipeline = &pipeline;
+
+	size_t usedResolveAttachmentsCount = std::count_if(state.ResolveAttachments.begin(), state.ResolveAttachments.end(), [](const auto& attachment) { return attachment.Image; });
+	std::vector<VkClearValue> clearValues(state.ColorAttachments.size() + usedResolveAttachmentsCount);
+	size_t i = 0;
+	for (auto& attachment : state.ColorAttachments)
+	{
+		VkClearValue clearValue{};
+		if (attachment.bClearEnabled)
+		{
+			memcpy(&clearValue, &attachment.ClearColor, sizeof(clearValue));
+			clearValues[i] = clearValue;
+		}
+		++i;
+	}
+
+	if (state.DepthStencilAttachment.Image)
+	{
+		VkClearValue clearValue{};
+		if (state.DepthStencilAttachment.bClearEnabled)
+			clearValue.depthStencil = { state.DepthStencilAttachment.DepthClearValue, state.DepthStencilAttachment.StencilClearValue };
+
+		clearValues.push_back(clearValue);
+	}
+
+	glm::uvec2 size = framebuffer.GetSize();
+	VkRenderPassBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	beginInfo.renderPass = pipeline.m_RenderPass;
+	beginInfo.framebuffer = framebuffer.GetVulkanFramebuffer();
+	beginInfo.clearValueCount = uint32_t(clearValues.size());
+	beginInfo.pClearValues = clearValues.data();
+	beginInfo.renderArea.extent = { size.x, size.y };
+	vkCmdBeginRenderPass(m_CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.m_GraphicsPipeline);
+
+	VkViewport viewport{};
+	viewport.width = float(size.x);
+	viewport.height = float(size.y);
+	viewport.minDepth = 0.f;
+	viewport.maxDepth = 1.f;
+	vkCmdSetViewport(m_CommandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.extent = { size.x, size.y };
+	vkCmdSetScissor(m_CommandBuffer, 0, 1, &scissor);
 }
 
 void VulkanCommandBuffer::EndGraphics()

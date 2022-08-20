@@ -1,5 +1,6 @@
 #include "VulkanSwapchain.h"
 #include "VulkanDevice.h"
+#include "VulkanUtils.h"
 
 #include <vector>
 #include <array>
@@ -65,9 +66,9 @@ VulkanSwapchain::~VulkanSwapchain()
 	VkDevice device = m_Device->GetVulkanDevice();
 
 	m_WaitSemaphores.clear();
-	DestroyImageViews();
-	DestroyFramebuffers();
-	vkDestroyRenderPass(device, m_RenderPass, nullptr);
+	for (auto& image : m_Images)
+		delete image;
+	m_Images.clear();
 	vkDestroySwapchainKHR(device, m_Swapchain, nullptr);
 	vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
 }
@@ -89,25 +90,35 @@ void VulkanSwapchain::Init(const VulkanDevice* device)
 
 void VulkanSwapchain::Present(const VulkanSemaphore* waitSemaphore)
 {
-	//auto& waitSemaphore = m_WaitSemaphores[m_FrameIndex].GetVulkanSemaphore();
 	VkPresentInfoKHR info{};
 	info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	info.pWaitSemaphores = &waitSemaphore->GetVulkanSemaphore();
-	info.waitSemaphoreCount = 1;
+	info.pWaitSemaphores = waitSemaphore ? &waitSemaphore->GetVulkanSemaphore() : nullptr;
+	info.waitSemaphoreCount = waitSemaphore ? 1 : 0;
 	info.swapchainCount = 1;
 	info.pSwapchains = &m_Swapchain;
 	info.pImageIndices = &m_SwapchainPresentImageIndex;
 
-	VK_CHECK(vkQueuePresentKHR(m_Device->GetPresentQueue(), &info));
-
-	m_FrameIndex = (m_FrameIndex + 1) % uint32_t(m_WaitSemaphores.size());
+	VkResult result = vkQueuePresentKHR(m_Device->GetPresentQueue(), &info);
+	if (result != VK_SUCCESS)
+	{
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+		{
+			// Swap chain is no longer compatible with the surface and needs to be recreated
+			OnResized();
+			return;
+		}
+		else VK_CHECK(result);
+	}
 }
 
-const VulkanSemaphore* VulkanSwapchain::NextFrame()
+const VulkanSemaphore* VulkanSwapchain::AcquireImage(uint32_t* outFrameIndex)
 {
-	auto& waitSemaphore = m_WaitSemaphores[m_FrameIndex].GetVulkanSemaphore();
-	VK_CHECK(vkAcquireNextImageKHR(m_Device->GetVulkanDevice(), m_Swapchain, UINT64_MAX, waitSemaphore, VK_NULL_HANDLE, &m_SwapchainPresentImageIndex));
-	return &m_WaitSemaphores[m_FrameIndex];
+	auto& semaphore = m_WaitSemaphores[m_FrameIndex];
+	VK_CHECK(vkAcquireNextImageKHR(m_Device->GetVulkanDevice(), m_Swapchain, UINT64_MAX, semaphore.GetVulkanSemaphore(), VK_NULL_HANDLE, &m_SwapchainPresentImageIndex));
+
+	*outFrameIndex = m_SwapchainPresentImageIndex;
+	m_FrameIndex = (m_FrameIndex + 1) % uint32_t(m_WaitSemaphores.size());
+	return &semaphore;
 }
 
 void VulkanSwapchain::RecreateSwapchain()
@@ -167,133 +178,28 @@ void VulkanSwapchain::RecreateSwapchain()
 
 	// Swapchain can create more images than we requested. So we should retrive image count
 	vkGetSwapchainImagesKHR(device, m_Swapchain, &imageCount, nullptr);
-	m_Images.resize(imageCount);
-	vkGetSwapchainImagesKHR(device, m_Swapchain, &imageCount, m_Images.data());
+	std::vector<VkImage> vkImages(imageCount);
+	vkGetSwapchainImagesKHR(device, m_Swapchain, &imageCount, vkImages.data());
 
-	if (m_RenderPass)
-		vkDestroyRenderPass(device, m_RenderPass, nullptr);
+	ImageSpecifications specs;
+	specs.Size = glm::uvec3{ m_Extent.width, m_Extent.height, 1u };
+	specs.Format = VulkanToImageFormat(m_Format.format);
+	specs.Usage = ImageUsage::ColorAttachment;
+	specs.Layout = ImageLayoutType::Present;
+	specs.Type = ImageType::Type2D;
 
-	CreateRenderPass();
-	CreateImageViews();
-	CreateFramebuffers();
-}
+	for (auto& image : m_Images)
+		delete image;
+	m_Images.clear();
 
-void VulkanSwapchain::CreateRenderPass()
-{
-	// Render pass
-	std::array<VkAttachmentDescription, 1> attachments{};
-	//Color Attachment
-	attachments[0].format = m_Format.format;
-	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-
-	VkAttachmentReference colorRef{};
-	colorRef.attachment = 0;
-	colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	VkSubpassDescription subpassDesc{};
-	subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpassDesc.colorAttachmentCount = 1;
-	subpassDesc.pColorAttachments = &colorRef;
-
-	VkSubpassDependency dependency{};
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.srcAccessMask = 0;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-	VkRenderPassCreateInfo renderPassCI{};
-	renderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassCI.attachmentCount = (uint32_t)attachments.size();
-	renderPassCI.dependencyCount = 1;
-	renderPassCI.pAttachments = attachments.data();
-	renderPassCI.pDependencies = &dependency;
-	renderPassCI.pSubpasses = &subpassDesc;
-	renderPassCI.subpassCount = 1;
-
-	VK_CHECK(vkCreateRenderPass(m_Device->GetVulkanDevice(), &renderPassCI, nullptr, &m_RenderPass));
-}
-
-void VulkanSwapchain::CreateImageViews()
-{
-	DestroyImageViews();
-	uint32_t imageCount = uint32_t(m_Images.size());
-	m_ImageViews.resize(imageCount);
-
-	VkImageViewCreateInfo viewCreateInfo{};
-	viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	viewCreateInfo.format = m_Format.format;
-	viewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	viewCreateInfo.subresourceRange.baseMipLevel = 0;
-	viewCreateInfo.subresourceRange.layerCount = 1;
-	viewCreateInfo.subresourceRange.levelCount = 1;
-
-	VkDevice device = m_Device->GetVulkanDevice();
-	for (uint32_t i = 0; i < imageCount; ++i)
-	{
-		viewCreateInfo.image = m_Images[i];
-		VK_CHECK(vkCreateImageView(device, &viewCreateInfo, nullptr, &m_ImageViews[i]));
-	}
-}
-
-void VulkanSwapchain::DestroyImageViews()
-{
-	VkDevice device = m_Device->GetVulkanDevice();
-	for (auto& view : m_ImageViews)
-		vkDestroyImageView(device, view, nullptr);
-	m_ImageViews.clear();
-}
-
-void VulkanSwapchain::CreateFramebuffers()
-{
-	DestroyFramebuffers();
-	
-	VkDevice device = m_Device->GetVulkanDevice();
-	size_t count = m_ImageViews.size();
-	m_Framebuffers.resize(count);
-
-
-	VkFramebufferCreateInfo ci{};
-	ci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	ci.attachmentCount = 1;
-	ci.layers = 1;
-	ci.width = m_Extent.width;
-	ci.height = m_Extent.height;
-	ci.renderPass = m_RenderPass;
-	for (size_t i = 0; i < count; ++i)
-	{
-		ci.pAttachments = &m_ImageViews[i];
-		VK_CHECK(vkCreateFramebuffer(device, &ci, nullptr, &m_Framebuffers[i]));
-	}
-}
-
-void VulkanSwapchain::DestroyFramebuffers()
-{
-	VkDevice device = m_Device->GetVulkanDevice();
-	for (auto& framebuffer : m_Framebuffers)
-	{
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
-	}
-	m_Framebuffers.clear();
+	for (auto& image : vkImages)
+		m_Images.push_back(new VulkanImage(image, specs, false));
 }
 
 void VulkanSwapchain::CreateSyncObjects()
 {
 	m_WaitSemaphores.clear();
 	
-	for (auto& imageView : m_ImageViews)
+	for (auto& imageView : m_Images)
 		m_WaitSemaphores.emplace_back();
 }

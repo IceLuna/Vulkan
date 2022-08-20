@@ -24,32 +24,19 @@ static const VkPipelineDepthStencilStateCreateInfo s_DefaultDepthStencilCI
 	0.f	 // maxDepthBounds
 };
 
-VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& state, uint32_t width, uint32_t height, const VulkanGraphicsPipeline* parentPipeline)
+VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& state, const VulkanGraphicsPipeline* parentPipeline)
 	: m_State(state)
-	, m_Width(width)
-	, m_Height(height)
 {
-	bool bDeviceSupportsConservativeRasterization = VulkanContext::GetDevice()->GetPhysicalDevice()->GetExtensionSupport().SupportsConservativeRasterization;
-	VkDevice device = VulkanContext::GetDevice()->GetVulkanDevice();
+	const VkDevice device = VulkanContext::GetDevice()->GetVulkanDevice();
 	const size_t colorAttachmentsCount = state.ColorAttachments.size();
+	const bool bDeviceSupportsConservativeRasterization = VulkanContext::GetDevice()->GetPhysicalDevice()->GetExtensionSupport().SupportsConservativeRasterization;
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	inputAssembly.topology = TopologyToVulkan(state.Topology);
 
-	VkViewport viewport{};
-	viewport.width  = float(m_Width);
-	viewport.height = float(m_Height);
-	viewport.minDepth = 0.f;
-	viewport.maxDepth = 1.f;
-
-	VkRect2D scissors{};
-	scissors.extent = { m_Width, m_Height };
-
 	VkPipelineViewportStateCreateInfo viewportState{};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportState.pScissors = &scissors;
-	viewportState.pViewports = &viewport;
 	viewportState.scissorCount = 1;
 	viewportState.viewportCount = 1;
 
@@ -133,8 +120,7 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 
 		uint32_t attachmentIndex = (uint32_t)attachmentDescs.size();
 		const bool bClearEnabled = state.ColorAttachments[i].bClearEnabled;
-		attachmentDescs.push_back({});
-		auto& desc = attachmentDescs.back();
+		auto& desc = attachmentDescs.emplace_back();
 		desc.samples = GetVulkanSamplesCount(renderTarget->GetSamplesCount());
 		desc.loadOp = bClearEnabled ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -237,6 +223,9 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 	renderPassCI.pSubpasses = &subpassDesc;
 	renderPassCI.subpassCount = 1;
 	VK_CHECK(vkCreateRenderPass(device, &renderPassCI, nullptr, &m_RenderPass));
+
+	m_Width = colorAttachmentsCount ? state.ColorAttachments[0].Image->GetSize().x : 0;
+	m_Height = colorAttachmentsCount ? state.ColorAttachments[0].Image->GetSize().y : 0;
 
 	VkFramebufferCreateInfo framebufferCI{};
 	framebufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

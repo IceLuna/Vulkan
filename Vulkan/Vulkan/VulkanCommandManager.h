@@ -13,6 +13,7 @@ enum class CommandQueueFamily
 
 class VulkanCommandBuffer;
 class VulkanGraphicsPipeline;
+class VulkanFramebuffer;
 
 class VulkanCommandManager
 {
@@ -68,7 +69,8 @@ public:
 	void Begin();
 	void End();
 
-	void BeginGraphics(const VulkanGraphicsPipeline& pipeline, uint32_t frameIndex = 0);
+	void BeginGraphics(const VulkanGraphicsPipeline& pipeline);
+	void BeginGraphics(const VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer);
 	void EndGraphics();
 	void Draw(uint32_t vertexCount, uint32_t firstVertex);
 

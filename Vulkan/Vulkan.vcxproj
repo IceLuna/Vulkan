@@ -105,6 +105,7 @@
     <ClCompile Include="Vulkan\VulkanCommandManager.cpp" />
     <ClCompile Include="Vulkan\VulkanContext.cpp" />
     <ClCompile Include="Vulkan\VulkanDevice.cpp" />
+    <ClCompile Include="Vulkan\VulkanFramebuffer.cpp" />
     <ClCompile Include="Vulkan\VulkanGraphicsPipeline.cpp" />
     <ClCompile Include="Vulkan\VulkanImage.cpp" />
     <ClCompile Include="Vulkan\VulkanMemoryAllocator\vk_mem_alloc.cpp" />
@@ -135,6 +136,7 @@
     <ClInclude Include="Vulkan\VulkanContext.h" />
     <ClInclude Include="Vulkan\VulkanDevice.h" />
     <ClInclude Include="Vulkan\VulkanFence.h" />
+    <ClInclude Include="Vulkan\VulkanFramebuffer.h" />
     <ClInclude Include="Vulkan\VulkanGraphicsPipeline.h" />
     <ClInclude Include="Vulkan\VulkanImage.h" />
     <ClInclude Include="Vulkan\VulkanMemoryAllocator\vk_mem_alloc.h" />

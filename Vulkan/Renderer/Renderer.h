@@ -5,7 +5,7 @@ class VulkanContext;
 class Renderer
 {
 public:
-	static void Init(unsigned int width, unsigned int height);
+	static void Init();
 	static void Shutdown();
 	static void DrawFrame();
 	static void OnWindowResized();

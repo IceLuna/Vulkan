@@ -101,13 +101,17 @@ private:
 class VulkanGraphicsPipeline
 {
 public:
-	VulkanGraphicsPipeline(const GraphicsPipelineState& state, uint32_t width, uint32_t height, const VulkanGraphicsPipeline* parentPipeline = nullptr);
+	VulkanGraphicsPipeline(const GraphicsPipelineState& state, const VulkanGraphicsPipeline* parentPipeline = nullptr);
 	~VulkanGraphicsPipeline();
 
 	VulkanGraphicsPipeline(const VulkanGraphicsPipeline&) = delete;
 	VulkanGraphicsPipeline& operator= (const VulkanGraphicsPipeline&) = delete;
 
 	const GraphicsPipelineState& GetState() const { return m_State; }
+	const void* GetRenderPassHandle() const { return m_RenderPass; }
+
+	uint32_t GetWidth() const { return m_Width; }
+	uint32_t GetHeight() const { return m_Height; }
 
 private:
 	GraphicsPipelineState m_State;

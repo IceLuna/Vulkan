@@ -29,7 +29,7 @@ Application::Application(uint32_t width, uint32_t height, const std::string& tit
     m_Window.SetResizeCallback(func);
     m_Window.InitContext();
 
-    Renderer::Init(width, height);
+    Renderer::Init();
 }
 
 Application::~Application()

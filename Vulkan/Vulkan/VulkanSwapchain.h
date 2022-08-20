@@ -3,6 +3,7 @@
 #include "Vulkan.h"
 #include "VulkanDevice.h"
 #include "VulkanSemaphore.h"
+#include "VulkanImage.h"
 
 class VulkanDevice;
 struct GLFWwindow;
@@ -28,29 +29,23 @@ public:
 
 	void OnResized() { RecreateSwapchain(); }
 
-	void Present(const VulkanSemaphore* waitSemaphore);
-	const VulkanSemaphore* NextFrame();
+	const std::vector<VulkanImage*>& GetImages() const { return m_Images; }
 
-	const std::vector<VkFramebuffer>& GetVulkanFramebuffers() const { return m_Framebuffers; }
-	VkRenderPass GetVulkanRenderpass() const { return m_RenderPass; }
+	void Present(const VulkanSemaphore* waitSemaphore);
+
+	// Returns a semaphore that will be signaled when image is ready
+	const VulkanSemaphore* AcquireImage(uint32_t* outFrameIndex);
 
 	uint32_t GetFrameIndex() const { return m_FrameIndex; }
+	glm::uvec2 GetSize() const { return { m_Extent.width, m_Extent.height }; }
 
 private:
 	void RecreateSwapchain();
-	void CreateRenderPass();
-	void CreateImageViews();
-	void DestroyImageViews();
-	void CreateFramebuffers();
-	void DestroyFramebuffers();
 	void CreateSyncObjects();
 
 private:
-	std::vector<VkImage> m_Images;
-	std::vector<VkImageView> m_ImageViews;
-	std::vector<VkFramebuffer> m_Framebuffers;
+	std::vector<VulkanImage*> m_Images;
 	std::vector<VulkanSemaphore> m_WaitSemaphores;
-	VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 	SwapchainSupportDetails m_SupportDetails;
 	VkExtent2D m_Extent;
 	VkSurfaceFormatKHR m_Format;

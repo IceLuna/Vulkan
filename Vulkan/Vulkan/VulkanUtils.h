@@ -314,6 +314,84 @@ inline VkFormat ImageFormatToVulkan(ImageFormat format)
 	return VK_FORMAT_UNDEFINED;
 }
 
+inline ImageFormat VulkanToImageFormat(VkFormat format)
+{
+	switch (format)
+	{
+		case VK_FORMAT_UNDEFINED: return ImageFormat::Unknown;
+		case VK_FORMAT_R32G32B32A32_SFLOAT: return ImageFormat::R32G32B32A32_Float;
+		case VK_FORMAT_R32G32B32A32_UINT: return ImageFormat::R32G32B32A32_UInt;
+		case VK_FORMAT_R32G32B32A32_SINT: return  ImageFormat::R32G32B32A32_SInt;
+		case VK_FORMAT_R32G32B32_SFLOAT: return ImageFormat::R32G32B32_Float;
+		case VK_FORMAT_R32G32B32_UINT: return ImageFormat::R32G32B32_UInt;
+		case VK_FORMAT_R32G32B32_SINT: return ImageFormat::R32G32B32_SInt;
+		case VK_FORMAT_R16G16B16A16_SFLOAT: return ImageFormat::R16G16B16A16_Float;
+		case VK_FORMAT_R16G16B16A16_UNORM: return ImageFormat::R16G16B16A16_UNorm;
+		case VK_FORMAT_R16G16B16A16_UINT: return ImageFormat::R16G16B16A16_UInt;
+		case VK_FORMAT_R16G16B16A16_SNORM: return ImageFormat::R16G16B16A16_SNorm;
+		case VK_FORMAT_R16G16B16A16_SINT: return ImageFormat::R16G16B16A16_SInt;
+		case VK_FORMAT_R32G32_SFLOAT: return ImageFormat::R32G32_Float;
+		case VK_FORMAT_R32G32_UINT: return ImageFormat::R32G32_UInt;
+		case VK_FORMAT_R32G32_SINT: return ImageFormat::R32G32_SInt;
+		case VK_FORMAT_D32_SFLOAT_S8_UINT: return ImageFormat::D32_Float_S8X24_UInt;
+		case VK_FORMAT_A2B10G10R10_UNORM_PACK32: return ImageFormat::R10G10B10A2_UNorm;
+		case VK_FORMAT_A2B10G10R10_UINT_PACK32: return ImageFormat::R10G10B10A2_UInt;
+		case VK_FORMAT_B10G11R11_UFLOAT_PACK32: return ImageFormat::R11G11B10_Float;
+		case VK_FORMAT_R8G8B8A8_UNORM: return ImageFormat::R8G8B8A8_UNorm;
+		case VK_FORMAT_R8G8B8A8_SRGB: return ImageFormat::R8G8B8A8_UNorm_SRGB;
+		case VK_FORMAT_R8G8B8A8_UINT: return ImageFormat::R8G8B8A8_UInt;
+		case VK_FORMAT_R8G8B8A8_SNORM: return ImageFormat::R8G8B8A8_SNorm;
+		case VK_FORMAT_R8G8B8A8_SINT: return ImageFormat::R8G8B8A8_SInt;
+		case VK_FORMAT_R16G16_SFLOAT: return ImageFormat::R16G16_Float;
+		case VK_FORMAT_R16G16_UNORM: return ImageFormat::R16G16_UNorm;
+		case VK_FORMAT_R16G16_UINT: return ImageFormat::R16G16_UInt;
+		case VK_FORMAT_R16G16_SNORM: return ImageFormat::R16G16_SNorm;
+		case VK_FORMAT_R16G16_SINT: return ImageFormat::R16G16_SInt;
+		case VK_FORMAT_D32_SFLOAT: return ImageFormat::D32_Float;
+		case VK_FORMAT_R32_SFLOAT: return ImageFormat::R32_Float;
+		case VK_FORMAT_R32_UINT: return ImageFormat::R32_UInt;
+		case VK_FORMAT_R32_SINT: return ImageFormat::R32_SInt;
+		case VK_FORMAT_D24_UNORM_S8_UINT: return ImageFormat::D24_UNorm_S8_UInt;
+		case VK_FORMAT_R8G8_UNORM: return ImageFormat::R8G8_UNorm;
+		case VK_FORMAT_R8G8_UINT: return ImageFormat::R8G8_UInt;
+		case VK_FORMAT_R8G8_SNORM: return ImageFormat::R8G8_SNorm;
+		case VK_FORMAT_R8G8_SINT: return ImageFormat::R8G8_SInt;
+		case VK_FORMAT_R16_SFLOAT: return ImageFormat::R16_Float;
+		case VK_FORMAT_D16_UNORM: return ImageFormat::D16_UNorm;
+		case VK_FORMAT_R16_UNORM: return ImageFormat::R16_UNorm;
+		case VK_FORMAT_R16_UINT: return ImageFormat::R16_UInt;
+		case VK_FORMAT_R16_SNORM: return ImageFormat::R16_SNorm;
+		case VK_FORMAT_R16_SINT: return ImageFormat::R16_SInt;
+		case VK_FORMAT_R8_UNORM: return ImageFormat::R8_UNorm;
+		case VK_FORMAT_R8_UINT: return ImageFormat::R8_UInt;
+		case VK_FORMAT_R8_SNORM: return ImageFormat::R8_SNorm;
+		case VK_FORMAT_R8_SINT: return ImageFormat::R8_SInt;
+		case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32: return ImageFormat::R9G9B9E5_SharedExp;
+		case VK_FORMAT_B8G8R8G8_422_UNORM: return ImageFormat::R8G8_B8G8_UNorm;
+		case VK_FORMAT_G8B8G8R8_422_UNORM: return ImageFormat::G8R8_G8B8_UNorm;
+		case VK_FORMAT_BC1_RGBA_UNORM_BLOCK: return ImageFormat::BC1_UNorm;
+		case VK_FORMAT_BC1_RGBA_SRGB_BLOCK: return ImageFormat::BC1_UNorm_SRGB;
+		case VK_FORMAT_BC2_UNORM_BLOCK: return ImageFormat::BC2_UNorm;
+		case VK_FORMAT_BC2_SRGB_BLOCK: return ImageFormat::BC2_UNorm_SRGB;
+		case VK_FORMAT_BC3_UNORM_BLOCK: return ImageFormat::BC3_UNorm;
+		case VK_FORMAT_BC3_SRGB_BLOCK: return ImageFormat::BC3_UNorm_SRGB;
+		case VK_FORMAT_BC4_UNORM_BLOCK: return ImageFormat::BC4_UNorm;
+		case VK_FORMAT_BC4_SNORM_BLOCK: return ImageFormat::BC4_SNorm;
+		case VK_FORMAT_BC5_UNORM_BLOCK: return ImageFormat::BC5_UNorm;
+		case VK_FORMAT_BC5_SNORM_BLOCK: return ImageFormat::BC5_SNorm;
+		case VK_FORMAT_B5G6R5_UNORM_PACK16: return ImageFormat::B5G6R5_UNorm;
+		case VK_FORMAT_B5G5R5A1_UNORM_PACK16: return ImageFormat::B5G5R5A1_UNorm;
+		case VK_FORMAT_B8G8R8A8_UNORM: return ImageFormat::B8G8R8A8_UNorm;
+		case VK_FORMAT_B8G8R8A8_SRGB: return ImageFormat::B8G8R8A8_UNorm_SRGB;
+		case VK_FORMAT_BC6H_UFLOAT_BLOCK: return ImageFormat::BC6H_UFloat16;
+		case VK_FORMAT_BC6H_SFLOAT_BLOCK: return ImageFormat::BC6H_SFloat16;
+		case VK_FORMAT_BC7_UNORM_BLOCK: return ImageFormat::BC7_UNorm;
+		case VK_FORMAT_BC7_SRGB_BLOCK: return		 ImageFormat::BC7_UNorm_SRGB;
+	}
+	assert(!"Unknown format");
+	return ImageFormat::Unknown;
+}
+
 inline VkImageType ImageTypeToVulkan(ImageType type)
 {
 	switch (type)

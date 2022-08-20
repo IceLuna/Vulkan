@@ -12,6 +12,16 @@ VulkanImage::VulkanImage(const ImageSpecifications& specs) : m_Specs(specs)
 	CreateImageView();
 }
 
+VulkanImage::VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns)
+	: m_Specs(specs)
+	, m_Image(vulkanImage)
+	, m_bOwns(bOwns)
+{
+	m_Device = VulkanContext::GetDevice()->GetVulkanDevice();
+	m_VulkanFormat = ImageFormatToVulkan(m_Specs.Format);
+	CreateImageView();
+}
+
 VulkanImage::~VulkanImage()
 {
 	ReleaseImageView();
@@ -20,6 +30,8 @@ VulkanImage::~VulkanImage()
 
 void VulkanImage::CreateImage()
 {
+	assert(m_bOwns);
+
 	m_VulkanFormat = ImageFormatToVulkan(m_Specs.Format);
 	VkImageCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -46,7 +58,7 @@ void VulkanImage::CreateImage()
 
 void VulkanImage::ReleaseImage()
 {
-	if (m_Image)
+	if (m_bOwns && m_Image)
 		VulkanAllocator::DestroyImage(m_Image, m_Allocation);
 }
 

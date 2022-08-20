@@ -235,11 +235,13 @@ class VulkanImage
 {
 public:
     VulkanImage(const ImageSpecifications& specs);
+    VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns);
     ~VulkanImage();
 
     bool HasUsage(ImageUsage usage) const { return HasFlags(m_Specs.Usage, usage); }
     VkImage GetImage() const { return m_Image; }
     VkImageView GetImageView() const { return m_DefaultImageView; }
+    VkImageView GetImageView(const ImageView& viewInfo);
 
     const glm::uvec3& GetSize() const { return m_Specs.Size; }
     ImageFormat GetFormat() const { return m_Specs.Format; }
@@ -251,7 +253,6 @@ public:
     uint32_t GetMipsCount() const { return m_Specs.MipsCount; }
     bool IsCube() const { return m_Specs.bIsCube; }
 
-    VkImageView GetImageView(const ImageView& viewInfo);
 
     void* Map();
     void Unmap();
@@ -278,4 +279,5 @@ private:
     VkImageView m_DefaultImageView = VK_NULL_HANDLE;
     VmaAllocation m_Allocation = VK_NULL_HANDLE;
     VkFormat m_VulkanFormat = VK_FORMAT_UNDEFINED;
+    bool m_bOwns = true;
 };
