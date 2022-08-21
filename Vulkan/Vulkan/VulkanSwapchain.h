@@ -12,7 +12,7 @@ class VulkanSwapchain
 {
 public:
 	VulkanSwapchain(VkInstance instance, GLFWwindow* window);
-	~VulkanSwapchain();
+	virtual ~VulkanSwapchain();
 
 	void Init(const VulkanDevice* device);
 	VkSurfaceKHR GetSurface() const { return m_Surface; }

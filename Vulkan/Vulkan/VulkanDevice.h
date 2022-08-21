@@ -34,6 +34,8 @@ struct ExtensionSupport
 	bool SupportsConservativeRasterization = false;
 };
 
+enum class ImageFormat;
+
 class VulkanPhysicalDevice
 {
 public:
@@ -45,6 +47,7 @@ public:
 	const std::vector<const char*> GetDeviceExtensions() const { return m_DeviceExtensions; }
 	SwapchainSupportDetails QuerySwapchainSupportDetails(VkSurfaceKHR surface) const;
 	const ExtensionSupport& GetExtensionSupport() const { return m_ExtensionSupport; }
+	bool IsMipGenerationSupported(ImageFormat format) const;
 
 	const VkPhysicalDeviceProperties& GetProperties() const { return m_Properties; }
 	const VkPhysicalDeviceMemoryProperties& GetMemoryProperties() const { return m_MemoryProperties; }
@@ -65,7 +68,7 @@ class VulkanDevice
 {
 public:
 	VulkanDevice(const std::unique_ptr<VulkanPhysicalDevice>& physicalDevice, const VkPhysicalDeviceFeatures& enabledFeatures);
-	~VulkanDevice();
+	virtual ~VulkanDevice();
 
 	void WaitIdle() const { vkDeviceWaitIdle(m_Device); }
 

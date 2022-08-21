@@ -136,6 +136,11 @@ void VulkanAllocator::UnmapMemory(VmaAllocation allocation)
 	vmaUnmapMemory(s_AllocatorData->Allocator, allocation);
 }
 
+void VulkanAllocator::FlushMemory(VmaAllocation allocation)
+{
+	vmaFlushAllocation(s_AllocatorData->Allocator, allocation, 0, VK_WHOLE_SIZE);
+}
+
 GPUMemoryStats VulkanAllocator::GetStats()
 {
 	const auto& memoryProps = s_AllocatorData->Device->GetPhysicalDevice()->GetMemoryProperties();

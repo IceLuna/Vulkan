@@ -1,5 +1,6 @@
 #include "VulkanDevice.h"
 #include "VulkanContext.h"
+#include "VulkanUtils.h"
 #include <set>
 
 static QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, bool bRequirePresent)
@@ -163,6 +164,13 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VkSurfaceKHR surface, bool bRequirePr
 SwapchainSupportDetails VulkanPhysicalDevice::QuerySwapchainSupportDetails(VkSurfaceKHR surface) const
 {
 	return QuerySwapchainSupport(m_PhysicalDevice, surface);
+}
+
+bool VulkanPhysicalDevice::IsMipGenerationSupported(ImageFormat format) const
+{
+	VkFormatProperties props{};
+	vkGetPhysicalDeviceFormatProperties(m_PhysicalDevice, ImageFormatToVulkan(format), &props);
+	return props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
 }
 
 VulkanDevice::VulkanDevice(const std::unique_ptr<VulkanPhysicalDevice>& physicalDevice, const VkPhysicalDeviceFeatures& enabledFeatures)

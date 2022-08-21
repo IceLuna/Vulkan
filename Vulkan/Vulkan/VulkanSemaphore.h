@@ -23,7 +23,7 @@ public:
 		other.m_Device = VK_NULL_HANDLE;
 	}
 
-	~VulkanSemaphore()
+	virtual ~VulkanSemaphore()
 	{
 		if (m_Semaphore)
 			vkDestroySemaphore(m_Device, m_Semaphore, nullptr);

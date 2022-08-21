@@ -102,6 +102,7 @@
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Vulkan\VulkanAllocator.cpp" />
+    <ClCompile Include="Vulkan\VulkanBuffer.cpp" />
     <ClCompile Include="Vulkan\VulkanCommandManager.cpp" />
     <ClCompile Include="Vulkan\VulkanContext.cpp" />
     <ClCompile Include="Vulkan\VulkanDevice.cpp" />
@@ -128,10 +129,12 @@
     <ClInclude Include="Core\FileSystem.h" />
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="Renderer\Renderer.h" />
+    <ClInclude Include="Renderer\RendererUtils.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="tiny_obj_loader.h" />
     <ClInclude Include="Vulkan\Vulkan.h" />
     <ClInclude Include="Vulkan\VulkanAllocator.h" />
+    <ClInclude Include="Vulkan\VulkanBuffer.h" />
     <ClInclude Include="Vulkan\VulkanCommandManager.h" />
     <ClInclude Include="Vulkan\VulkanContext.h" />
     <ClInclude Include="Vulkan\VulkanDevice.h" />

@@ -20,7 +20,7 @@ class VulkanShader
 {
 public:
 	VulkanShader(const std::filesystem::path& path, ShaderType shaderType, const ShaderDefines& defines = {});
-	~VulkanShader();
+	virtual ~VulkanShader();
 
 	const VkPipelineShaderStageCreateInfo& GetPipelineShaderStageInfo() const { return m_PipelineShaderStageCI; }
 	const std::vector<VkVertexInputAttributeDescription>& GetInputAttribs() const { return m_VertexAttribs; }

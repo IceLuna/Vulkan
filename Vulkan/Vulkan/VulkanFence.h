@@ -17,7 +17,7 @@ public:
 		VK_CHECK(vkCreateFence(m_Device, &ci, nullptr, &m_Fence));
 	}
 
-	~VulkanFence()
+	virtual ~VulkanFence()
 	{
 		if (m_Fence)
 			vkDestroyFence(m_Device, m_Fence, nullptr);
@@ -46,6 +46,17 @@ public:
 	}
 
 	const VkFence& GetVulkanFence() const { return m_Fence; }
+	bool IsSignaled() const
+	{
+		VkResult result = vkGetFenceStatus(m_Device, m_Fence);
+		if (result == VK_SUCCESS)
+			return true;
+		else if (result == VK_NOT_READY)
+			return false;
+
+		VulkanCheckResult(result);
+		return false;
+	}
 	void Reset() { VK_CHECK(vkResetFences(m_Device, 1, &m_Fence)); }
 	void Wait(uint64_t timeout = UINT64_MAX) { VK_CHECK(vkWaitForFences(m_Device, 1, &m_Fence, VK_FALSE, timeout)); }
 

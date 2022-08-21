@@ -19,6 +19,7 @@ VulkanImage::VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, 
 {
 	m_Device = VulkanContext::GetDevice()->GetVulkanDevice();
 	m_VulkanFormat = ImageFormatToVulkan(m_Specs.Format);
+	m_AspectMask = GetImageAspectFlags(m_VulkanFormat);
 	CreateImageView();
 }
 
@@ -28,11 +29,22 @@ VulkanImage::~VulkanImage()
 	ReleaseImage();
 }
 
+VkImageAspectFlags VulkanImage::GetTransitionAspectMask(ImageLayout oldLayout, ImageLayout newLayout) const
+{
+	VkImageLayout vkOldLayout = ToVulkanLayout(oldLayout);
+	VkImageLayout vkNewLayout = ToVulkanLayout(newLayout);
+	if (vkOldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL && (vkNewLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL || vkNewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL))
+		return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+	return m_AspectMask;
+}
+
 void VulkanImage::CreateImage()
 {
 	assert(m_bOwns);
 
 	m_VulkanFormat = ImageFormatToVulkan(m_Specs.Format);
+	m_AspectMask = GetImageAspectFlags(m_VulkanFormat);
 	VkImageCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	info.imageType = ImageTypeToVulkan(m_Specs.Type);
@@ -65,7 +77,7 @@ void VulkanImage::ReleaseImage()
 void VulkanImage::CreateImageView()
 {
 	ReleaseImageView();
-	m_DefaultImageView = GetImageView({ 0, 0 });
+	m_DefaultImageView = GetImageView({ 0, m_Specs.MipsCount, 0 });
 }
 
 VkImageView VulkanImage::GetImageView(const ImageView& viewInfo)
@@ -80,14 +92,25 @@ VkImageView VulkanImage::GetImageView(const ImageView& viewInfo)
 	viewCI.image = m_Image;
 	viewCI.format = m_VulkanFormat;
 	viewCI.viewType = ImageTypeToVulkanImageViewType(m_Specs.Type, m_Specs.bIsCube);
-	viewCI.subresourceRange.aspectMask = GetImageAspectFlags(m_VulkanFormat);
+	viewCI.subresourceRange.aspectMask = m_AspectMask;
 	viewCI.subresourceRange.baseMipLevel = viewInfo.MipLevel;
 	viewCI.subresourceRange.baseArrayLayer = viewInfo.Layer;
-	viewCI.subresourceRange.levelCount = m_Specs.MipsCount;
+	viewCI.subresourceRange.levelCount = viewInfo.MipLevels;
 	viewCI.subresourceRange.layerCount = m_Specs.bIsCube ? 6 : 1;
 	VK_CHECK(vkCreateImageView(m_Device, &viewCI, nullptr, &imageView));
 
 	return imageView;
+}
+
+void* VulkanImage::Map()
+{
+	assert(VulkanAllocator::IsHostVisible(m_Allocation));
+	return VulkanAllocator::MapMemory(m_Allocation);
+}
+
+void VulkanImage::Unmap()
+{
+	VulkanAllocator::UnmapMemory(m_Allocation);
 }
 
 void VulkanImage::ReleaseImageView()

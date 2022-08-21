@@ -1,78 +1,9 @@
 #pragma once
 
 #include "Vulkan.h"
-#include "VulkanImage.h"
+#include "../Renderer/RendererUtils.h"
 
-enum class BlendOperation
-{
-	Add,
-	Substract,
-	ReverseSubstract,
-	Min,
-	Max
-};
-
-enum class BlendFactor
-{
-	Zero,
-	One,
-	SrcColor,
-	OneMinusSrcColor,
-	DstColor,
-	OneMinusDstColor,
-	SrcAlpha,
-	OneMinusSrcAlpha,
-	DstAlpha,
-	OneMinusDstAlpha,
-	ConstantColor,
-	OneMinusConstantColor,
-	ConstantAlpha,
-	OneMinusConstantAlpha,
-	AlphaSaturate,
-	Src1Color,
-	OneMinusSrc1Color,
-	Src1Alpha,
-	OneMinusSrc1Alpha
-};
-
-struct BlendState
-{
-	BlendState(BlendOperation blendOp = BlendOperation::Add, BlendFactor blendSrc = BlendFactor::One, BlendFactor blendDst = BlendFactor::Zero,
-		BlendOperation blendOpAlpha = BlendOperation::Add, BlendFactor blendSrcAlpha = BlendFactor::One, BlendFactor blendDstAlpha = BlendFactor::Zero)
-		: BlendOp(blendOp)
-		, BlendSrc(blendSrc)
-		, BlendDst(blendDst)
-		, BlendOpAlpha(blendOpAlpha)
-		, BlendSrcAlpha(blendSrcAlpha)
-		, BlendDstAlpha(blendDstAlpha) {}
-
-	BlendOperation BlendOp;
-	BlendFactor BlendSrc;
-	BlendFactor BlendDst;
-
-	BlendOperation BlendOpAlpha;
-	BlendFactor BlendSrcAlpha;
-	BlendFactor BlendDstAlpha;
-};
-
-enum class CompareOperation
-{
-	Never,
-	Less,
-	Equal,
-	LessEqual,
-	Greater,
-	NotEqual,
-	GreaterEqual,
-	Always
-};
-
-enum class Topology
-{
-	Triangles,
-	Lines,
-	Points
-};
+#include <vector>
 
 static inline VkPrimitiveTopology TopologyToVulkan(Topology topology)
 {
@@ -118,7 +49,7 @@ inline VkCompareOp CompareOpToVulkan(CompareOperation compareOp)
 	}
 }
 
-inline VkImageLayout GetVulkanLayout(ImageLayout imageLayout)
+inline VkImageLayout ToVulkanLayout(ImageLayout imageLayout)
 {
 	switch (imageLayout.LayoutType)
 	{
@@ -457,4 +388,348 @@ inline VkImageAspectFlags GetImageAspectFlags(VkFormat format)
 	else if (bHasDepth) return VK_IMAGE_ASPECT_DEPTH_BIT;
 	else if (bHasStencil) return VK_IMAGE_ASPECT_STENCIL_BIT;
 	else return VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
+inline void GetTransitionStagesAndAccesses(
+	VkImageLayout oldLayout, VkQueueFlags oldQueueFlags,
+	VkImageLayout newLayout, VkQueueFlags newQueueFlags,
+	VkPipelineStageFlags* outSrcStage, VkAccessFlags* outSrcAccess,
+	VkPipelineStageFlags* outDstStage, VkAccessFlags* outDstAccess)
+{
+	// Old
+	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+	{
+		*outSrcAccess = 0;
+		*outSrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL)
+	{
+		*outSrcAccess = 0;
+		*outSrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		*outSrcAccess = VK_ACCESS_SHADER_READ_BIT;
+		*outSrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+	{
+		*outSrcAccess = VK_ACCESS_TRANSFER_WRITE_BIT;
+		*outSrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+	{
+		*outSrcAccess = VK_ACCESS_TRANSFER_READ_BIT;
+		*outSrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL)
+	{
+		*outSrcAccess = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		*outSrcStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+	{
+		*outSrcAccess = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		*outSrcStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+	{
+		*outSrcAccess = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		*outSrcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	}
+	else assert(!"Unsupported layout transition!");
+
+	// New
+	if (newLayout == VK_IMAGE_LAYOUT_GENERAL)
+	{
+		*outDstAccess = 0;
+		*outDstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	}
+	else if (newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+	{
+		*outDstAccess = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		*outDstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	}
+	else if (newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		*outDstAccess = VK_ACCESS_SHADER_READ_BIT;
+		*outDstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	}
+	else if (newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+	{
+		*outDstAccess = VK_ACCESS_TRANSFER_WRITE_BIT;
+		*outDstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+	{
+		*outDstAccess = VK_ACCESS_TRANSFER_READ_BIT;
+		*outDstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL)
+	{
+		*outDstAccess = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		*outDstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	}
+	else if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+	{
+		*outDstAccess = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		*outDstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	}
+	else if (newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+	{
+		*outDstAccess = VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
+		*outDstStage = VK_PIPELINE_STAGE_HOST_BIT;
+	}
+	else assert(!"Unsupported layout transition!");
+
+	// Dst access exception case
+	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+		*outDstAccess = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+
+	// Src stage exception cases
+	if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+		*outSrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; // VK_PIPELINE_STAGE_TRANSFER_BIT should be OK
+
+	if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+		*outSrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; // VK_PIPELINE_STAGE_TRANSFER_BIT should be OK
+
+	if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+	{
+		*outSrcStage = 0;
+		if (oldQueueFlags & VK_QUEUE_GRAPHICS_BIT)
+			*outSrcStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (oldQueueFlags & VK_QUEUE_COMPUTE_BIT)
+			*outSrcStage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	}
+
+	if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+	{
+		*outSrcStage = 0;
+		if (oldQueueFlags & VK_QUEUE_GRAPHICS_BIT)
+			*outSrcStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (oldQueueFlags & VK_QUEUE_COMPUTE_BIT)
+			*outSrcStage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	}
+
+	// Dst stage exception cases
+	if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+		*outDstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; // VK_PIPELINE_STAGE_TRANSFER_BIT should be OK
+
+	if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		*outDstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; // VK_PIPELINE_STAGE_TRANSFER_BIT should be OK
+
+	if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		*outDstStage = 0;
+		if (newQueueFlags & VK_QUEUE_GRAPHICS_BIT)
+			*outDstStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (newQueueFlags & VK_QUEUE_COMPUTE_BIT)
+			*outDstStage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	}
+
+	if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		*outDstStage = 0;
+		if (newQueueFlags & VK_QUEUE_GRAPHICS_BIT)
+			*outDstStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (newQueueFlags & VK_QUEUE_COMPUTE_BIT)
+			*outDstStage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	}
+}
+
+inline VkBufferUsageFlags BufferUsageToVulkan(BufferUsage usage)
+{
+	VkBufferUsageFlags res = 0;
+
+	// We don't need a separate usage in BufferUsage enum for VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT 
+	// because we use it only with buffers used in raytracing: scratch, instance, vertex and index buffers.
+	// So add this usage implicitly for those usages.
+	if ((usage & BufferUsage::TransferSrc) == BufferUsage::TransferSrc)
+	{
+		res |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		usage &= ~BufferUsage::TransferSrc;
+	}
+
+	if ((usage & BufferUsage::TransferDst) == BufferUsage::TransferDst)
+	{
+		res |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		usage &= ~BufferUsage::TransferDst;
+	}
+
+	if ((usage & BufferUsage::UniformTexelBuffer) == BufferUsage::UniformTexelBuffer)
+	{
+		res |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+		usage &= ~BufferUsage::UniformTexelBuffer;
+	}
+
+	if ((usage & BufferUsage::StorageTexelBuffer) == BufferUsage::StorageTexelBuffer)
+	{
+		res |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+		usage &= ~BufferUsage::StorageTexelBuffer;
+	}
+
+	if ((usage & BufferUsage::UniformBuffer) == BufferUsage::UniformBuffer)
+	{
+		res |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		usage &= ~BufferUsage::UniformBuffer;
+	}
+
+	if ((usage & BufferUsage::StorageBuffer) == BufferUsage::StorageBuffer)
+	{
+		res |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		usage &= ~BufferUsage::StorageBuffer;
+	}
+
+	if ((usage & BufferUsage::IndexBuffer) == BufferUsage::IndexBuffer)
+	{
+		res |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+		usage &= ~BufferUsage::IndexBuffer;
+
+		res |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+	}
+
+	if ((usage & BufferUsage::VertexBuffer) == BufferUsage::VertexBuffer)
+	{
+		res |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		usage &= ~BufferUsage::VertexBuffer;
+
+		res |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+	}
+
+	if ((usage & BufferUsage::IndirectBuffer) == BufferUsage::IndirectBuffer)
+	{
+		res |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+		usage &= ~BufferUsage::IndirectBuffer;
+	}
+
+	if ((usage & BufferUsage::RayTracing) == BufferUsage::RayTracing)
+	{
+		res |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+		usage &= ~BufferUsage::RayTracing;
+
+		res |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+	}
+
+	if ((usage & BufferUsage::AccelerationStructure) == BufferUsage::AccelerationStructure)
+	{
+		res |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+		usage &= ~BufferUsage::AccelerationStructure;
+	}
+
+	if ((usage & BufferUsage::AccelerationStructureBuildInput)
+		== BufferUsage::AccelerationStructureBuildInput)
+	{
+		res |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+		usage &= ~BufferUsage::AccelerationStructureBuildInput;
+	}
+
+	assert(usage == BufferUsage::None);
+	return res;
+}
+
+inline void GetStageAndAccess(BufferLayout layout, VkQueueFlags queueFlags, VkPipelineStageFlags* outStage, VkAccessFlags* outAccess)
+{
+    *outStage = 0;
+    *outAccess = 0;
+
+    switch (layout.LayoutType)
+    {
+		case BufferLayoutType::ReadOnly:
+		{
+			BufferReadAccess readAccessFlags = layout.ReadAccessFlags;
+			if (HasFlags(readAccessFlags, BufferReadAccess::CopySource))
+			{
+				assert(queueFlags & VK_QUEUE_TRANSFER_BIT);
+				*outStage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+				*outAccess |= VK_ACCESS_TRANSFER_READ_BIT;
+				readAccessFlags &= ~BufferReadAccess::CopySource;
+			}
+			if (HasFlags(readAccessFlags, BufferReadAccess::Vertex))
+			{
+				assert(queueFlags & VK_QUEUE_GRAPHICS_BIT);
+				*outStage |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+				*outAccess |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+				readAccessFlags &= ~BufferReadAccess::Vertex;
+			}
+			if (HasFlags(readAccessFlags, BufferReadAccess::Index))
+			{
+				assert(queueFlags & VK_QUEUE_GRAPHICS_BIT);
+				*outStage |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+				*outAccess |= VK_ACCESS_INDEX_READ_BIT;
+				readAccessFlags &= ~BufferReadAccess::Index;
+			}
+			if (HasFlags(readAccessFlags, BufferReadAccess::Uniform))
+			{
+				assert((queueFlags & VK_QUEUE_GRAPHICS_BIT) || (queueFlags & VK_QUEUE_COMPUTE_BIT));
+				if (queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				{
+					*outStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				}
+				if (queueFlags & VK_QUEUE_COMPUTE_BIT)
+				{
+					*outStage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+				}
+				*outAccess |= VK_ACCESS_UNIFORM_READ_BIT;
+				readAccessFlags &= ~BufferReadAccess::Uniform;
+			}
+			if (HasFlags(readAccessFlags, BufferReadAccess::IndirectArgument))
+			{
+				assert((queueFlags & VK_QUEUE_GRAPHICS_BIT) || (queueFlags & VK_QUEUE_COMPUTE_BIT));
+				*outStage |= VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+				*outAccess |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+				readAccessFlags &= ~BufferReadAccess::IndirectArgument;
+			}
+			if (HasFlags(readAccessFlags, BufferReadAccess::PixelShaderRead))
+			{
+				assert(queueFlags & VK_QUEUE_GRAPHICS_BIT);
+				*outStage |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				*outAccess |= VK_ACCESS_SHADER_READ_BIT;
+				readAccessFlags &= ~BufferReadAccess::PixelShaderRead;
+			}
+			if (HasFlags(readAccessFlags, BufferReadAccess::NonPixelShaderRead))
+			{
+				assert((queueFlags & VK_QUEUE_GRAPHICS_BIT) || (queueFlags & VK_QUEUE_COMPUTE_BIT));
+				if (queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				{
+					*outStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+				}
+				if (queueFlags & VK_QUEUE_COMPUTE_BIT)
+				{
+					*outStage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+				}
+				*outAccess |= VK_ACCESS_SHADER_READ_BIT;
+				readAccessFlags &= ~BufferReadAccess::NonPixelShaderRead;
+			}
+			assert(readAccessFlags == BufferReadAccess::None);
+			return;
+		}
+		case BufferLayoutType::CopyDest:
+		{
+			assert(queueFlags & VK_QUEUE_TRANSFER_BIT);
+			*outStage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+			*outAccess |= VK_ACCESS_TRANSFER_WRITE_BIT;
+			return;
+		}
+		case BufferLayoutType::StorageBuffer:
+		{
+			assert((queueFlags & VK_QUEUE_GRAPHICS_BIT) || (queueFlags & VK_QUEUE_COMPUTE_BIT));
+			if (queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				*outStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			}
+			if (queueFlags & VK_QUEUE_COMPUTE_BIT)
+			{
+				*outStage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+			}
+			*outAccess |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+			return;
+		}
+		case BufferLayoutType::Unknown:
+		{
+			*outAccess = 0;
+			*outStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			return;
+		}
+		default: assert(!"Unsupported BufferLayoutType");
+    }
 }

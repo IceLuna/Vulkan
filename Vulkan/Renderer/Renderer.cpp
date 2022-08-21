@@ -10,6 +10,9 @@
 #include "../Vulkan/VulkanGraphicsPipeline.h"
 #include "../Vulkan/VulkanSwapchain.h"
 #include "../Vulkan/VulkanFramebuffer.h"
+#include "../Vulkan/VulkanFence.h"
+#include "../Vulkan/VulkanSemaphore.h"
+#include "../Vulkan/VulkanCommandManager.h"
 
 static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
 static uint32_t s_CurrentFrame = 0;

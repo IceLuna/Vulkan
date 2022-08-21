@@ -11,7 +11,7 @@ class VulkanFramebuffer
 {
 public:
 	VulkanFramebuffer(const std::vector<VulkanImage*>& images, const void* renderPassHandle, glm::uvec2 size);
-	~VulkanFramebuffer()
+	virtual ~VulkanFramebuffer()
 	{
 		if (m_Framebuffer)
 			vkDestroyFramebuffer(m_Device, m_Framebuffer, nullptr);

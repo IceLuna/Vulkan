@@ -102,7 +102,7 @@ class VulkanGraphicsPipeline
 {
 public:
 	VulkanGraphicsPipeline(const GraphicsPipelineState& state, const VulkanGraphicsPipeline* parentPipeline = nullptr);
-	~VulkanGraphicsPipeline();
+	virtual ~VulkanGraphicsPipeline();
 
 	VulkanGraphicsPipeline(const VulkanGraphicsPipeline&) = delete;
 	VulkanGraphicsPipeline& operator= (const VulkanGraphicsPipeline&) = delete;

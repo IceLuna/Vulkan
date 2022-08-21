@@ -28,6 +28,7 @@ public:
 	static bool IsHostVisible(VmaAllocation allocation);
 	static void* MapMemory(VmaAllocation allocation);
 	static void UnmapMemory(VmaAllocation allocation);
+	static void FlushMemory(VmaAllocation allocation);
 
 	GPUMemoryStats GetStats();
 };
