@@ -23,6 +23,9 @@ public:
 	HWND GetHandler() const { return glfwGetWin32Window(m_Window); }
 	VulkanContext& GetRenderContext() { return *m_RenderContext; }
 	VulkanSwapchain* GetSwapchain() { return m_Swapchain; }
+	
+	void SetVSyncEnabled(bool bEnabled);
+	bool IsVSyncEnabled() const;
 
 	void SetResizeCallback(std::function<void(uint32_t, uint32_t)> func);
 

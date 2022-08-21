@@ -64,5 +64,5 @@ inline void VulkanCheckResult(VkResult result)
 	VulkanCheckResult(res);\
 }
 #else
-#define VK_CHECK_RESULT(f) (f);
+#define VK_CHECK(f) (f);
 #endif

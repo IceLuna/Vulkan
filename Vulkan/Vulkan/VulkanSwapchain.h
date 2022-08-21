@@ -56,5 +56,5 @@ private:
 	GLFWwindow* m_Window = nullptr;
 	uint32_t m_FrameIndex = 0;
 	uint32_t m_SwapchainPresentImageIndex = 0;
-	bool m_bVSyncEnabled = true;
+	bool m_bVSyncEnabled = false;
 };

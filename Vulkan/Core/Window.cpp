@@ -47,6 +47,16 @@ void Window::InitContext()
     m_Swapchain->Init(m_RenderContext->GetContextDevice());
 }
 
+void Window::SetVSyncEnabled(bool bEnabled)
+{
+    m_Swapchain->SetVSyncEnabled(bEnabled);
+}
+
+bool Window::IsVSyncEnabled() const
+{
+    return m_Swapchain->IsVSyncEnabled();
+}
+
 void Window::SetResizeCallback(std::function<void(uint32_t, uint32_t)> func)
 {
     s_ResizeCallback = func;

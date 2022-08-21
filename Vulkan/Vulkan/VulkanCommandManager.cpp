@@ -30,7 +30,7 @@ static VkQueue SelectQueue(CommandQueueFamily queueFamily, const VulkanDevice* d
 //------------------
 // COMMAND MANAGER
 //------------------
-VulkanCommandManager::VulkanCommandManager(CommandQueueFamily queueFamily)
+VulkanCommandManager::VulkanCommandManager(CommandQueueFamily queueFamily, bool bAllowReuse)
 {
 	const VulkanDevice* device = VulkanContext::GetDevice();
 	VkDevice vulkanDevice = device->GetVulkanDevice();
@@ -40,6 +40,7 @@ VulkanCommandManager::VulkanCommandManager(CommandQueueFamily queueFamily)
 	VkCommandPoolCreateInfo ci{};
 	ci.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	ci.queueFamilyIndex = m_QueueFamilyIndex;
+	ci.flags = bAllowReuse ? VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : 0;
 
 	VK_CHECK(vkCreateCommandPool(vulkanDevice, &ci, nullptr, &m_CommandPool));
 }
@@ -50,10 +51,11 @@ VulkanCommandManager::~VulkanCommandManager()
 		vkDestroyCommandPool(VulkanContext::GetDevice()->GetVulkanDevice(), m_CommandPool, nullptr);
 }
 
-VulkanCommandBuffer VulkanCommandManager::AllocateCommandBuffer()
+VulkanCommandBuffer VulkanCommandManager::AllocateCommandBuffer(bool bBegin)
 {
 	VulkanCommandBuffer cmd(*this);
-	cmd.Begin();
+	if (bBegin)
+		cmd.Begin();
 	return cmd;
 }
 

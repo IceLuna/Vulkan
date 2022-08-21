@@ -1,10 +1,7 @@
 #include "Renderer.h"
 #include "../Core/Application.h"
 
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <chrono>
+#include <array>
 
 #include "../Vulkan/VulkanContext.h"
 #include "../Vulkan/VulkanDevice.h"
@@ -14,7 +11,7 @@
 #include "../Vulkan/VulkanSwapchain.h"
 #include "../Vulkan/VulkanFramebuffer.h"
 
-const int MAX_FRAMES_IN_FLIGHT = 3;
+static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
 static uint32_t s_CurrentFrame = 0;
 
 struct Data
@@ -23,20 +20,25 @@ struct Data
 	VulkanCommandManager* CommandManager = nullptr;
 	VulkanSwapchain* Swapchain = nullptr;
 	std::vector<VulkanFramebuffer*> Framebuffers;
+
+	std::vector<VulkanCommandBuffer> CommandBuffers;
+	std::vector<VulkanFence> Fences;
+	std::array<VulkanSemaphore, MAX_FRAMES_IN_FLIGHT> Semaphores;
 };
 
-static Data s_Data;
+static Data* s_Data = nullptr;
 
 void Renderer::Init()
 {
 	VulkanAllocator::Init(VulkanContext::GetDevice());
 	VulkanPipelineCache::Init();
-	s_Data.Swapchain = Application::GetApp().GetWindow().GetSwapchain();
+	s_Data = new Data;
+	s_Data->Swapchain = Application::GetApp().GetWindow().GetSwapchain();
 
 	VulkanShader vertexShader("Shaders/basic.vert", ShaderType::Vertex);
 	VulkanShader fragmentShader("Shaders/basic.frag", ShaderType::Fragment);
 
-	auto& swapchainImages = s_Data.Swapchain->GetImages();
+	auto& swapchainImages = s_Data->Swapchain->GetImages();
 
 	GraphicsPipelineState::ColorAttachment colorAttachment;
 	colorAttachment.Image = swapchainImages[0];
@@ -50,22 +52,33 @@ void Renderer::Init()
 	state.FragmentShader = &fragmentShader;
 	state.ColorAttachments.push_back(colorAttachment);
 
-	s_Data.Pipeline = new VulkanGraphicsPipeline(state);
-	s_Data.CommandManager = new VulkanCommandManager(CommandQueueFamily::Graphics);
+	s_Data->Pipeline = new VulkanGraphicsPipeline(state);
+	s_Data->CommandManager = new VulkanCommandManager(CommandQueueFamily::Graphics, true);
 
 	for (auto& image : swapchainImages)
-		s_Data.Framebuffers.push_back(new VulkanFramebuffer({ image }, s_Data.Pipeline->GetRenderPassHandle(), s_Data.Swapchain->GetSize()));
+		s_Data->Framebuffers.push_back(new VulkanFramebuffer({ image }, s_Data->Pipeline->GetRenderPassHandle(), s_Data->Swapchain->GetSize()));
+
+	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		s_Data->Fences.emplace_back(true);
+		s_Data->CommandBuffers.emplace_back(s_Data->CommandManager->AllocateCommandBuffer(false));
+	}
 }
 
 void Renderer::Shutdown()
 {
 	VulkanContext::GetDevice()->WaitIdle();
 
-	delete s_Data.Pipeline;
-	delete s_Data.CommandManager;
-	for (auto& fb : s_Data.Framebuffers)
+	delete s_Data->Pipeline;
+	s_Data->CommandBuffers.clear();
+	s_Data->Fences.clear();
+	delete s_Data->CommandManager;
+
+	for (auto& fb : s_Data->Framebuffers)
 		delete fb;
-	s_Data.Framebuffers.clear();
+	s_Data->Framebuffers.clear();
+
+	delete s_Data;
 
 	VulkanPipelineCache::Shutdown();
 	VulkanAllocator::Shutdown();
@@ -73,33 +86,39 @@ void Renderer::Shutdown()
 
 void Renderer::DrawFrame()
 {
-	uint32_t frameIndex = 0;
-	auto imageAcquireSemaphore = s_Data.Swapchain->AcquireImage(&frameIndex);
+	auto& semaphore = s_Data->Semaphores[s_CurrentFrame];
+	auto& fence = s_Data->Fences[s_CurrentFrame];
+	auto& cmd = s_Data->CommandBuffers[s_CurrentFrame];
 
-	auto cmd = s_Data.CommandManager->AllocateCommandBuffer();
-	cmd.BeginGraphics(*s_Data.Pipeline, *s_Data.Framebuffers[frameIndex]);
+	fence.Wait();
+	fence.Reset();
+
+	uint32_t imageIndex = 0;
+	auto imageAcquireSemaphore = s_Data->Swapchain->AcquireImage(&imageIndex);
+
+	cmd.Begin();
+	cmd.BeginGraphics(*s_Data->Pipeline, *s_Data->Framebuffers[imageIndex]);
 	cmd.Draw(3, 0);
 	cmd.EndGraphics();
 	cmd.End();
 
-	VulkanSemaphore semaphore;
-	s_Data.CommandManager->Submit(&cmd, 1, imageAcquireSemaphore, 1, &semaphore, 1, nullptr);
+	s_Data->CommandManager->Submit(&cmd, 1, imageAcquireSemaphore, 1, &semaphore, 1, &fence);
+	s_Data->Swapchain->Present(&semaphore);
 
-	s_Data.Swapchain->Present(&semaphore);
-	VulkanContext::GetDevice()->WaitIdle();
+	s_CurrentFrame = (s_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void Renderer::OnWindowResized()
 {
-	for (auto& fb : s_Data.Framebuffers)
+	for (auto& fb : s_Data->Framebuffers)
 		delete fb;
-	s_Data.Framebuffers.clear();
+	s_Data->Framebuffers.clear();
 
-	auto& swapchainImages = s_Data.Swapchain->GetImages();
-	const void* renderPassHandle = s_Data.Pipeline->GetRenderPassHandle();
-	glm::uvec2 size = s_Data.Swapchain->GetSize();
+	auto& swapchainImages = s_Data->Swapchain->GetImages();
+	const void* renderPassHandle = s_Data->Pipeline->GetRenderPassHandle();
+	glm::uvec2 size = s_Data->Swapchain->GetSize();
 	for (auto& image : swapchainImages)
-		s_Data.Framebuffers.push_back(new VulkanFramebuffer({ image }, renderPassHandle, size));
+		s_Data->Framebuffers.push_back(new VulkanFramebuffer({ image }, renderPassHandle, size));
 }
 
 void Renderer::BeginImGui()

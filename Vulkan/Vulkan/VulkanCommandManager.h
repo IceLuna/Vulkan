@@ -18,7 +18,8 @@ class VulkanFramebuffer;
 class VulkanCommandManager
 {
 public:
-	VulkanCommandManager(CommandQueueFamily queueFamily);
+	// @bAllowReuse. If set to true, allows already allocated command buffers to be rerecorded.
+	VulkanCommandManager(CommandQueueFamily queueFamily, bool bAllowReuse);
 	~VulkanCommandManager();
 
 	VulkanCommandManager(const VulkanCommandManager&) = delete;
@@ -27,7 +28,7 @@ public:
 	VulkanCommandManager& operator=(const VulkanCommandManager&) = delete;
 	VulkanCommandManager& operator=(VulkanCommandManager&& other) noexcept = delete;
 
-	VulkanCommandBuffer AllocateCommandBuffer();
+	VulkanCommandBuffer AllocateCommandBuffer(bool bBegin = true);
 
 	void Submit(const VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
 		const VulkanSemaphore* waitSemaphores = nullptr,   uint32_t waitSemaphoresCount = 0,
@@ -48,6 +49,7 @@ private:
 	VulkanCommandBuffer(const VulkanCommandManager& manager);
 
 public:
+	VulkanCommandBuffer() = default;
 	VulkanCommandBuffer(const VulkanCommandBuffer&) = delete;
 	VulkanCommandBuffer(VulkanCommandBuffer&& other) noexcept
 	{
@@ -64,7 +66,23 @@ public:
 	~VulkanCommandBuffer();
 
 	VulkanCommandBuffer& operator=(const VulkanCommandBuffer&) = delete;
-	VulkanCommandBuffer& operator=(VulkanCommandBuffer&& other) noexcept = delete;
+	VulkanCommandBuffer& operator=(VulkanCommandBuffer&& other) noexcept
+	{
+		if (m_CommandBuffer)
+			vkFreeCommandBuffers(m_Device, m_CommandPool, 1, &m_CommandBuffer);
+
+		m_Device = other.m_Device;
+		m_CommandPool = other.m_CommandPool;
+		m_CommandBuffer = other.m_CommandBuffer;
+		m_CurrentGraphicsPipeline = other.m_CurrentGraphicsPipeline;
+
+		other.m_Device = VK_NULL_HANDLE;
+		other.m_CommandBuffer = VK_NULL_HANDLE;
+		other.m_CommandPool = VK_NULL_HANDLE;
+		other.m_CurrentGraphicsPipeline = nullptr;
+
+		return *this;
+	}
 
 	void Begin();
 	void End();
