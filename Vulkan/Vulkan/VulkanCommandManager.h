@@ -103,6 +103,8 @@ public:
 	void EndGraphics();
 	void Draw(uint32_t vertexCount, uint32_t firstVertex);
 
+	void SetGraphicsRootConstants(const void* vertexRootConstants, const void* fragmentRootConstants);
+
 	void StorageImageBarrier(VulkanImage* image) { TransitionLayout(image, ImageLayoutType::StorageImage, ImageLayoutType::StorageImage); }
 	void TransitionLayout(VulkanImage* image, ImageLayout oldLayout, ImageLayout newLayout);
 	void TransitionLayout(VulkanImage* image, const ImageView& imageView, ImageLayout oldLayout, ImageLayout newLayout);

@@ -101,10 +101,12 @@
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="Vulkan\DescriptorSetData.cpp" />
     <ClCompile Include="Vulkan\VulkanAllocator.cpp" />
     <ClCompile Include="Vulkan\VulkanBuffer.cpp" />
     <ClCompile Include="Vulkan\VulkanCommandManager.cpp" />
     <ClCompile Include="Vulkan\VulkanContext.cpp" />
+    <ClCompile Include="Vulkan\VulkanDescriptorManager.cpp" />
     <ClCompile Include="Vulkan\VulkanDevice.cpp" />
     <ClCompile Include="Vulkan\VulkanFramebuffer.cpp" />
     <ClCompile Include="Vulkan\VulkanGraphicsPipeline.cpp" />
@@ -132,11 +134,13 @@
     <ClInclude Include="Renderer\RendererUtils.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="tiny_obj_loader.h" />
+    <ClInclude Include="Vulkan\DescriptorSetData.h" />
     <ClInclude Include="Vulkan\Vulkan.h" />
     <ClInclude Include="Vulkan\VulkanAllocator.h" />
     <ClInclude Include="Vulkan\VulkanBuffer.h" />
     <ClInclude Include="Vulkan\VulkanCommandManager.h" />
     <ClInclude Include="Vulkan\VulkanContext.h" />
+    <ClInclude Include="Vulkan\VulkanDescriptorManager.h" />
     <ClInclude Include="Vulkan\VulkanDevice.h" />
     <ClInclude Include="Vulkan\VulkanFence.h" />
     <ClInclude Include="Vulkan\VulkanFramebuffer.h" />
@@ -144,6 +148,7 @@
     <ClInclude Include="Vulkan\VulkanImage.h" />
     <ClInclude Include="Vulkan\VulkanMemoryAllocator\vk_mem_alloc.h" />
     <ClInclude Include="Vulkan\VulkanPipelineCache.h" />
+    <ClInclude Include="Vulkan\VulkanSampler.h" />
     <ClInclude Include="Vulkan\VulkanSemaphore.h" />
     <ClInclude Include="Vulkan\VulkanShader.h" />
     <ClInclude Include="Vulkan\VulkanSwapchain.h" />

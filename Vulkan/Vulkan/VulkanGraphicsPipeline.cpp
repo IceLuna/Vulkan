@@ -1,9 +1,13 @@
 #include "VulkanGraphicsPipeline.h"
 #include "VulkanContext.h"
 #include "VulkanPipelineCache.h"
+#include "VulkanDescriptorManager.h"
+#include "VulkanSwapchain.h"
+#include "VulkanImage.h"
+#include "VulkanBuffer.h"
+#include "VulkanSampler.h"
 
 #include "../Renderer/Renderer.h"
-#include "VulkanSwapchain.h"
 #include "../Core/Application.h"
 
 #include <array>
@@ -23,6 +27,42 @@ static const VkPipelineDepthStencilStateCreateInfo s_DefaultDepthStencilCI
 	0.f, // minDepthBounds
 	0.f	 // maxDepthBounds
 };
+
+static void MergeDescriptorSetLayoutBindings(std::vector<VkDescriptorSetLayoutBinding>& dstBindings,
+	const std::vector<VkDescriptorSetLayoutBinding>& srcBindings)
+{
+	std::vector<VkDescriptorSetLayoutBinding> newBindings;
+	newBindings.reserve(srcBindings.size());
+
+	auto cmp = [](const VkDescriptorSetLayoutBinding& a, const VkDescriptorSetLayoutBinding& b)
+	{
+		return a.binding < b.binding;
+	};
+
+	auto dstIt = dstBindings.begin();
+	for (auto& srcBinding : srcBindings)
+	{
+		dstIt = std::lower_bound(dstIt, dstBindings.end(), srcBinding, cmp);
+
+		if (dstIt == dstBindings.end() || dstIt->binding > srcBinding.binding)
+			newBindings.push_back(srcBinding);
+		else
+			dstIt->stageFlags |= srcBinding.stageFlags;
+	}
+
+	dstBindings.insert(dstBindings.end(), newBindings.begin(), newBindings.end());
+	std::sort(dstBindings.begin(), dstBindings.end(), cmp);
+}
+
+static void MergeDescriptorSetLayoutBindings(std::vector<std::vector<VkDescriptorSetLayoutBinding>>& dstSetBindings,
+	const std::vector<std::vector<VkDescriptorSetLayoutBinding>>& srcSetBindings)
+{
+	if (srcSetBindings.size() > dstSetBindings.size())
+		dstSetBindings.resize(srcSetBindings.size());
+
+	for (std::size_t i = 0; i < srcSetBindings.size(); i++)
+		MergeDescriptorSetLayoutBindings(dstSetBindings[i], srcSetBindings[i]);
+}
 
 VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& state, const VulkanGraphicsPipeline* parentPipeline)
 	: m_State(state)
@@ -84,10 +124,46 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 	colorBlending.attachmentCount = (uint32_t)colorBlendAttachmentStates.size();
 	colorBlending.pAttachments = colorBlendAttachmentStates.data();
 
-	VkPipelineLayoutCreateInfo pipelineLayoutCI{};
-	pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	// Pipeline layout
+	{
+		m_SetBindings = state.VertexShader->GeLayoutSetBindings();
+		if (state.GeometryShader)
+			MergeDescriptorSetLayoutBindings(m_SetBindings, state.GeometryShader->GeLayoutSetBindings());
+		MergeDescriptorSetLayoutBindings(m_SetBindings, state.FragmentShader->GeLayoutSetBindings());
+		const uint32_t setsCount = (uint32_t)m_SetBindings.size();
 
-	VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &m_PipelineLayout));
+		m_SetLayouts.clear();
+		m_SetLayouts.resize(setsCount);
+		for (uint32_t i = 0; i < setsCount; ++i)
+		{
+			VkDescriptorSetLayoutCreateInfo layoutInfo{};
+			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			layoutInfo.bindingCount = (uint32_t)m_SetBindings[i].size();
+			layoutInfo.pBindings = m_SetBindings[i].data();
+
+			VK_CHECK(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &m_SetLayouts[i]));
+		}
+
+		std::vector<VkPushConstantRange> pushConstants;
+		for (auto& range : state.VertexShader->GetPushConstantRanges())
+			pushConstants.push_back(range);
+
+		if (state.GeometryShader)
+			for (auto& range : state.GeometryShader->GetPushConstantRanges())
+				pushConstants.push_back(range);
+
+		for (auto& range : state.FragmentShader->GetPushConstantRanges())
+			pushConstants.push_back(range);
+
+		VkPipelineLayoutCreateInfo pipelineLayoutCI{};
+		pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutCI.setLayoutCount = setsCount;
+		pipelineLayoutCI.pSetLayouts = m_SetLayouts.data();
+		pipelineLayoutCI.pushConstantRangeCount = (uint32_t)pushConstants.size();
+		pipelineLayoutCI.pPushConstantRanges = pushConstants.data();
+
+		VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &m_PipelineLayout));
+	}
 
 	// Render pass
 	std::vector<VkAttachmentDescription> attachmentDescs;
@@ -131,7 +207,7 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 		desc.finalLayout = ToVulkanLayout(state.ColorAttachments[i].FinalLayout);
 
 		colorRefs[i] = { attachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-		attachmentsImageViews.push_back(renderTarget->GetImageView());
+		attachmentsImageViews.push_back(renderTarget->GetVulkanImageView());
 	}
 
 	for (size_t i = 0; i < state.ResolveAttachments.size(); ++i)
@@ -158,7 +234,7 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 		desc.finalLayout = ToVulkanLayout(state.ResolveAttachments[i].FinalLayout);
 
 		resolveRefs[i] = { attachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-		attachmentsImageViews.push_back(renderTarget->GetImageView());
+		attachmentsImageViews.push_back(renderTarget->GetVulkanImageView());
 	}
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilCI = s_DefaultDepthStencilCI;
@@ -185,7 +261,7 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 		depthStencilCI.depthWriteEnable = state.DepthStencilAttachment.bWriteDepth;
 
 		depthRef.push_back({ attachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL });
-		attachmentsImageViews.push_back(depthStencilImage->GetImageView());
+		attachmentsImageViews.push_back(depthStencilImage->GetVulkanImageView());
 	}
 
 	assert(depthRef.size() == 0 || depthRef.size() == 1);
@@ -347,8 +423,126 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 VulkanGraphicsPipeline::~VulkanGraphicsPipeline()
 {
 	VkDevice device = VulkanContext::GetDevice()->GetVulkanDevice();
+	for (auto& setLayout : m_SetLayouts)
+		vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
+
+	m_SetLayouts.clear();
+	m_DescriptorSets.clear();
+	m_DescriptorSetData.clear();
+
 	vkDestroyPipeline(device, m_GraphicsPipeline, nullptr);
 	vkDestroyRenderPass(device, m_RenderPass, nullptr);
 	vkDestroyFramebuffer(device, m_Framebuffer, nullptr);
 	vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
+
+	m_GraphicsPipeline = VK_NULL_HANDLE;
+	m_RenderPass = VK_NULL_HANDLE;
+	m_Framebuffer = VK_NULL_HANDLE;
+	m_PipelineLayout = VK_NULL_HANDLE;
 }
+
+void VulkanGraphicsPipeline::SetBuffer(const VulkanBuffer* buffer, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, buffer);
+}
+
+void VulkanGraphicsPipeline::SetBuffer(const VulkanBuffer* buffer, size_t offset, size_t size, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, buffer, offset, size);
+}
+
+void VulkanGraphicsPipeline::SetBufferArray(const std::vector<const VulkanBuffer*>& buffers, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArgArray(binding, buffers);
+}
+
+void VulkanGraphicsPipeline::SetImage(const VulkanImage* image, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, image);
+}
+
+void VulkanGraphicsPipeline::SetImage(const VulkanImage* image, const ImageView& imageView, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, image, imageView);
+}
+
+void VulkanGraphicsPipeline::SetImageArray(const std::vector<const VulkanImage*>& images, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArgArray(binding, images);
+}
+
+void VulkanGraphicsPipeline::SetImageArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArgArray(binding, images, imageViews);
+}
+
+void VulkanGraphicsPipeline::SetSampler(const VulkanSampler* sampler, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, sampler);
+}
+
+void VulkanGraphicsPipeline::SetImageSampler(const VulkanImage* image, const VulkanSampler* sampler, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, image, sampler);
+}
+
+void VulkanGraphicsPipeline::SetImageSampler(const VulkanImage* image, const ImageView& imageView, const VulkanSampler* sampler, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, image, imageView, sampler);
+}
+
+void VulkanGraphicsPipeline::SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArgArray(binding, images, samplers);
+}
+
+void VulkanGraphicsPipeline::SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArgArray(binding, images, imageViews, samplers);
+}
+
+void VulkanGraphicsPipeline::CommitDescriptors()
+{
+	struct SetData
+	{
+		DescriptorSetData* Data;
+		uint32_t Set;
+	};
+
+	std::vector<SetData> dirtyDatas;
+	dirtyDatas.reserve(m_DescriptorSetData.size());
+	for (auto& it : m_DescriptorSetData)
+	{
+		if (it.second.IsDirty())
+			dirtyDatas.push_back({ &it.second, it.first });
+	}
+
+	if (dirtyDatas.empty())
+		return;
+
+	const size_t dirtyDataCount = dirtyDatas.size();
+	std::vector<DescriptorWriteData> writeData;
+	writeData.reserve(dirtyDataCount);
+
+	// Populating writeData. Allocating DescriptorSet if neccessary
+	for (size_t i = 0; i < dirtyDataCount; ++i)
+	{
+		uint32_t set = dirtyDatas[i].Set;
+		VulkanDescriptorSet* currentDescriptorSet = nullptr;
+
+		auto it = m_DescriptorSets.find(set);
+		if (it == m_DescriptorSets.end())
+		{
+			VulkanDescriptorSet& nonInitializedSet = m_DescriptorSets[set];
+			nonInitializedSet = VulkanDescriptorManager::AllocateDescriptorSet(this, set);
+			currentDescriptorSet = &nonInitializedSet;
+		}
+		else currentDescriptorSet = &it->second;
+
+		assert(currentDescriptorSet);
+		writeData.push_back({ currentDescriptorSet, dirtyDatas[i].Data });
+	}
+
+	VulkanDescriptorManager::WriteDescriptors(this, writeData);
+}
+

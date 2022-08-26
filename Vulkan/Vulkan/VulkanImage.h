@@ -64,8 +64,10 @@ public:
 
     bool HasUsage(ImageUsage usage) const { return HasFlags(m_Specs.Usage, usage); }
     VkImage GetImage() const { return m_Image; }
-    VkImageView GetImageView() const { return m_DefaultImageView; }
-    VkImageView GetImageView(const ImageView& viewInfo);
+
+    ImageView GetImageView() const { return ImageView{ 0, m_Specs.MipsCount, 0 }; }
+    VkImageView GetVulkanImageView() const { return m_DefaultImageView; }
+    VkImageView GetVulkanImageView(const ImageView& viewInfo) const;
 
     const glm::uvec3& GetSize() const { return m_Specs.Size; }
     ImageFormat GetFormat() const { return m_Specs.Format; }
@@ -81,7 +83,7 @@ public:
     void* Map();
     void Unmap();
 
-    void Write(VulkanCommandBuffer* cmd, const ImageView& imageView, const void* data, ImageLayout initialLayout, ImageLayout finalLayout);
+    //void Write(VulkanCommandBuffer* cmd, const ImageView& imageView, const void* data, ImageLayout initialLayout, ImageLayout finalLayout);
     void Read(void* data, size_t size, ImageLayout initialLayout, ImageLayout finalLayout);
 
     VkFormat GetVulkanFormat() const { return m_VulkanFormat; }
@@ -96,7 +98,7 @@ private:
     void ReleaseImageView();
 
 private:
-    std::unordered_map<ImageView, VkImageView> m_Views;
+    mutable std::unordered_map<ImageView, VkImageView> m_Views; // Mutable by `GetVulkanImageView(const ImageView&)`
 
     ImageSpecifications m_Specs;
     VkDevice m_Device = VK_NULL_HANDLE;

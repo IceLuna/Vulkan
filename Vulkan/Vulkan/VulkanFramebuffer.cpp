@@ -13,7 +13,7 @@ VulkanFramebuffer::VulkanFramebuffer(const std::vector<VulkanImage*>& images, co
 	const size_t imagesCount = images.size();
 	std::vector<VkImageView> imageViews(imagesCount);
 	for (size_t i = 0; i < imagesCount; ++i)
-		imageViews[i] = images[i]->GetImageView();
+		imageViews[i] = images[i]->GetVulkanImageView();
 
 	VkFramebufferCreateInfo framebufferCI{};
 	framebufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

@@ -77,10 +77,10 @@ void VulkanImage::ReleaseImage()
 void VulkanImage::CreateImageView()
 {
 	ReleaseImageView();
-	m_DefaultImageView = GetImageView({ 0, m_Specs.MipsCount, 0 });
+	m_DefaultImageView = GetVulkanImageView({ 0, m_Specs.MipsCount, 0 });
 }
 
-VkImageView VulkanImage::GetImageView(const ImageView& viewInfo)
+VkImageView VulkanImage::GetVulkanImageView(const ImageView& viewInfo) const
 {
 	auto it = m_Views.find(viewInfo);
 	if (it != m_Views.end())

@@ -5,7 +5,7 @@
 
 #include <vector>
 
-static inline VkPrimitiveTopology TopologyToVulkan(Topology topology)
+inline VkPrimitiveTopology TopologyToVulkan(Topology topology)
 {
 	switch (topology)
 	{
@@ -21,32 +21,6 @@ static inline VkPrimitiveTopology TopologyToVulkan(Topology topology)
 	}
 
 	return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
-}
-
-inline VkCompareOp CompareOpToVulkan(CompareOperation compareOp)
-{
-	switch (compareOp)
-	{
-	case CompareOperation::Never:
-		return VK_COMPARE_OP_NEVER;
-	case CompareOperation::Less:
-		return VK_COMPARE_OP_LESS;
-	case CompareOperation::Equal:
-		return VK_COMPARE_OP_EQUAL;
-	case CompareOperation::LessEqual:
-		return VK_COMPARE_OP_LESS_OR_EQUAL;
-	case CompareOperation::Greater:
-		return VK_COMPARE_OP_GREATER;
-	case CompareOperation::NotEqual:
-		return VK_COMPARE_OP_NOT_EQUAL;
-	case CompareOperation::GreaterEqual:
-		return VK_COMPARE_OP_GREATER_OR_EQUAL;
-	case CompareOperation::Always:
-		return VK_COMPARE_OP_ALWAYS;
-	default:
-		assert(false);
-		return VK_COMPARE_OP_NEVER;
-	}
 }
 
 inline VkImageLayout ToVulkanLayout(ImageLayout imageLayout)
@@ -732,4 +706,110 @@ inline void GetStageAndAccess(BufferLayout layout, VkQueueFlags queueFlags, VkPi
 		}
 		default: assert(!"Unsupported BufferLayoutType");
     }
+}
+
+inline VkSamplerAddressMode AddressModeToVulkan(AddressMode addressMode)
+{
+	switch (addressMode)
+	{
+		case AddressMode::Wrap: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		case AddressMode::Mirror: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+		case AddressMode::Clamp: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		case AddressMode::ClampToOpaqueBlack:
+		case AddressMode::ClampToOpaqueWhite: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		case AddressMode::MirrorOnce: return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+		default:
+			assert(!"Unsupported address mode");
+			return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	}
+}
+
+inline VkBorderColor BorderColorForAddressMode(AddressMode addressMode)
+{
+	switch (addressMode)
+	{
+		case AddressMode::Wrap:
+		case AddressMode::Mirror:
+		case AddressMode::Clamp:
+		case AddressMode::MirrorOnce: return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+		case AddressMode::ClampToOpaqueBlack: return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+		case AddressMode::ClampToOpaqueWhite: return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		default:
+			assert(!"Unsupported address mode");
+			return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+	}
+}
+
+inline VkCompareOp CompareOpToVulkan(CompareOperation compareOp)
+{
+	switch (compareOp)
+	{
+		case CompareOperation::Never: return VK_COMPARE_OP_NEVER;
+		case CompareOperation::Less: return VK_COMPARE_OP_LESS;
+		case CompareOperation::Equal: return VK_COMPARE_OP_EQUAL;
+		case CompareOperation::LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+		case CompareOperation::Greater: return VK_COMPARE_OP_GREATER;
+		case CompareOperation::NotEqual: return VK_COMPARE_OP_NOT_EQUAL;
+		case CompareOperation::GreaterEqual: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+		case CompareOperation::Always: return VK_COMPARE_OP_ALWAYS;
+		default:
+			assert(!"Unsupported compare op");
+			return VK_COMPARE_OP_NEVER;
+	}
+}
+
+inline void FilterModeToVulkan(FilterMode filterMode, VkFilter* outMinFilter, VkFilter* outMagFilter, VkSamplerMipmapMode* outMipmapMode)
+{
+	switch (filterMode)
+	{
+		case FilterMode::Point:
+			*outMinFilter = VK_FILTER_NEAREST;
+			*outMagFilter = VK_FILTER_NEAREST;
+			*outMipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			break;
+		case FilterMode::Bilinear:
+			*outMinFilter = VK_FILTER_LINEAR;
+			*outMagFilter = VK_FILTER_LINEAR;
+			*outMipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			break;
+		case FilterMode::Trilinear:
+			*outMinFilter = VK_FILTER_LINEAR;
+			*outMagFilter = VK_FILTER_LINEAR;
+			*outMipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			break;
+		case FilterMode::Anisotropic:
+			*outMinFilter = VK_FILTER_LINEAR;
+			*outMagFilter = VK_FILTER_LINEAR;
+			*outMipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			break;
+		default:
+			assert(!"Unsupported filter mode");
+			*outMinFilter = VK_FILTER_NEAREST;
+			*outMagFilter = VK_FILTER_NEAREST;
+			break;
+	}
+}
+
+inline bool IsBufferType(VkDescriptorType type)
+{
+	return
+		type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
+		type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+		type == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER ||
+		type == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER ||
+		type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC ||
+		type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+}
+
+inline bool IsImageType(VkDescriptorType type)
+{
+	return
+		type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+		type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+		type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+}
+
+inline bool IsSamplerType(VkDescriptorType type)
+{
+	return type == VK_DESCRIPTOR_TYPE_SAMPLER;
 }

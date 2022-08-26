@@ -13,6 +13,7 @@
 #include "../Vulkan/VulkanFence.h"
 #include "../Vulkan/VulkanSemaphore.h"
 #include "../Vulkan/VulkanCommandManager.h"
+#include "../Vulkan/VulkanDescriptorManager.h"
 
 static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
 static uint32_t s_CurrentFrame = 0;
@@ -35,6 +36,8 @@ void Renderer::Init()
 {
 	VulkanAllocator::Init(VulkanContext::GetDevice());
 	VulkanPipelineCache::Init();
+	VulkanDescriptorManager::Init();
+
 	s_Data = new Data;
 	s_Data->Swapchain = Application::GetApp().GetWindow().GetSwapchain();
 
@@ -82,7 +85,9 @@ void Renderer::Shutdown()
 	s_Data->Framebuffers.clear();
 
 	delete s_Data;
+	s_Data = nullptr;
 
+	VulkanDescriptorManager::Shutdown();
 	VulkanPipelineCache::Shutdown();
 	VulkanAllocator::Shutdown();
 }

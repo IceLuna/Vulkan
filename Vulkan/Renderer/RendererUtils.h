@@ -178,7 +178,11 @@ struct ImageView
 
     bool operator== (const ImageView& other) const noexcept
     {
-        return MipLevel == other.MipLevel && Layer == other.Layer;
+        return MipLevel == other.MipLevel && Layer == other.Layer && MipLevels == other.MipLevels;
+    }
+    bool operator!= (const ImageView& other) const noexcept
+    {
+        return !((*this) == other);
     }
 };
 
@@ -292,6 +296,24 @@ struct BlendState
     BlendOperation BlendOpAlpha;
     BlendFactor BlendSrcAlpha;
     BlendFactor BlendDstAlpha;
+};
+
+enum class FilterMode
+{
+    Point,
+    Bilinear,
+    Trilinear,
+    Anisotropic
+};
+
+enum class AddressMode
+{
+    Wrap,
+    Mirror,
+    Clamp,
+    ClampToOpaqueBlack,
+    ClampToOpaqueWhite,
+    MirrorOnce
 };
 
 enum class CompareOperation

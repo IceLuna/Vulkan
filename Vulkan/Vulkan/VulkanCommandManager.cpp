@@ -4,6 +4,7 @@
 #include "VulkanFramebuffer.h"
 #include "VulkanImage.h"
 #include "VulkanBuffer.h"
+#include "VulkanShader.h"
 
 static uint32_t SelectQueueFamilyIndex(CommandQueueFamily queueFamily, const QueueFamilyIndices& indices)
 {
@@ -260,6 +261,43 @@ void VulkanCommandBuffer::EndGraphics()
 void VulkanCommandBuffer::Draw(uint32_t vertexCount, uint32_t firstVertex)
 {
 	vkCmdDraw(m_CommandBuffer, vertexCount, 1, firstVertex, 0);
+}
+
+void VulkanCommandBuffer::SetGraphicsRootConstants(const void* vertexRootConstants, const void* fragmentRootConstants)
+{
+	assert(m_CurrentGraphicsPipeline);
+	const auto& pipelineState = m_CurrentGraphicsPipeline->GetState();
+	
+	const VulkanShader* vs = pipelineState.VertexShader;
+	const VulkanShader* fs = pipelineState.FragmentShader;
+	VkPipelineLayout pipelineLayout = m_CurrentGraphicsPipeline->GetVulkanPipelineLayout();
+
+	// Also sets fragmentRootConstants if present
+	if (vertexRootConstants)
+	{
+		auto& ranges = vs->GetPushConstantRanges();
+		assert(ranges.size());
+
+		VkPushConstantRange range = ranges[0];
+		range.stageFlags |= (vertexRootConstants == fragmentRootConstants) ? VK_SHADER_STAGE_FRAGMENT_BIT : 0;
+		vkCmdPushConstants(m_CommandBuffer, pipelineLayout, range.stageFlags, range.offset, range.size, vertexRootConstants);
+	}
+	if (fragmentRootConstants && (vertexRootConstants != fragmentRootConstants))
+	{
+		auto& ranges = fs->GetPushConstantRanges();
+		assert(ranges.size());
+
+		VkPushConstantRange range = ranges[0];
+		if (vertexRootConstants)
+		{
+			auto& vsRanges = vs->GetPushConstantRanges();
+			assert(vsRanges.size());
+
+			range.offset += vsRanges[0].size;
+			range.size -= vsRanges[0].size;
+		}
+		vkCmdPushConstants(m_CommandBuffer, pipelineLayout, range.stageFlags, range.offset, range.size, fragmentRootConstants);
+	}
 }
 
 void VulkanCommandBuffer::TransitionLayout(VulkanImage* image, ImageLayout oldLayout, ImageLayout newLayout)
