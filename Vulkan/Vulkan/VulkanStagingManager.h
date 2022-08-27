@@ -30,7 +30,7 @@ public:
 		m_bIsCPURead = other.m_bIsCPURead;
 
 		other.m_Buffer = nullptr;
-		other.m_Fence = nullptr;
+		other.m_Fence.reset();
 		other.m_State = StagingBufferState::Free;
 		other.m_bIsCPURead = false;
 	}
@@ -45,7 +45,7 @@ public:
 		m_bIsCPURead = other.m_bIsCPURead;
 
 		other.m_Buffer = nullptr;
-		other.m_Fence = nullptr;
+		other.m_Fence.reset();
 		other.m_State = StagingBufferState::Free;
 		other.m_bIsCPURead = false;
 
@@ -56,9 +56,9 @@ public:
 	void Unmap() { m_Buffer->Unmap(); }
 
 	void SetState(StagingBufferState state) { m_State = state; }
-	void SetFence(const VulkanFence* fence) { m_Fence = fence; }
-	const VulkanFence* GetFence() { return m_Fence; }
-	const VulkanFence* GetFence() const { return m_Fence; }
+	void SetFence(const Ref<VulkanFence>& fence) { m_Fence = fence; }
+	Ref<VulkanFence>& GetFence() { return m_Fence; }
+	const Ref<VulkanFence>& GetFence() const { return m_Fence; }
 
 	StagingBufferState GetState() const { return m_State; }
 	size_t GetSize() const { return m_Buffer->GetSize(); }
@@ -68,7 +68,7 @@ public:
 
 private:
 	VulkanBuffer* m_Buffer = nullptr;
-	const VulkanFence* m_Fence = nullptr; // Not owned
+	Ref<VulkanFence> m_Fence = nullptr;
 	StagingBufferState m_State = StagingBufferState::Free;
 	bool m_bIsCPURead = false;
 

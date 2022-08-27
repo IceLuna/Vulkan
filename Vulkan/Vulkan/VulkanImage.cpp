@@ -2,6 +2,9 @@
 #include "VulkanContext.h"
 #include "VulkanAllocator.h"
 #include "VulkanUtils.h"
+#include "VulkanCommandManager.h"
+
+#include "../Renderer/Renderer.h"
 
 VulkanImage::VulkanImage(const ImageSpecifications& specs) : m_Specs(specs)
 {
@@ -10,6 +13,14 @@ VulkanImage::VulkanImage(const ImageSpecifications& specs) : m_Specs(specs)
 	m_Device = VulkanContext::GetDevice()->GetVulkanDevice();
 	CreateImage();
 	CreateImageView();
+
+	auto commandManager = Renderer::GetGraphicsCommandManager();
+	auto cmd = commandManager->AllocateCommandBuffer();
+	Ref<VulkanFence> fence = MakeRef<VulkanFence>();
+	cmd.TransitionLayout(this, ImageLayoutType::Unknown, m_Specs.Layout);
+	cmd.End();
+	commandManager->Submit(&cmd, 1, fence, nullptr, 0, nullptr, 0);
+	fence->Wait(); // TODO: Measure how much it takes to change layout
 }
 
 VulkanImage::VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns)

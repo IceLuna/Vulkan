@@ -23,15 +23,14 @@ static uint32_t s_CurrentFrame = 0;
 struct Data
 {
 	VulkanGraphicsPipeline* Pipeline = nullptr;
-	VulkanCommandManager* CommandManager = nullptr;
+	VulkanCommandManager* GraphicsCommandManager = nullptr;
 	VulkanSwapchain* Swapchain = nullptr;
 	std::vector<VulkanFramebuffer*> Framebuffers;
 
 	std::vector<VulkanCommandBuffer> CommandBuffers;
-	std::vector<VulkanFence> Fences;
+	std::vector<Ref<VulkanFence>> Fences;
 	std::array<VulkanSemaphore, MAX_FRAMES_IN_FLIGHT> Semaphores;
 
-	VulkanFence WriteToTextureFence;
 	VulkanImage* Texture = nullptr;
 	VulkanSampler* Sampler = nullptr;
 };
@@ -65,15 +64,15 @@ void Renderer::Init()
 	state.ColorAttachments.push_back(colorAttachment);
 
 	s_Data->Pipeline = new VulkanGraphicsPipeline(state);
-	s_Data->CommandManager = new VulkanCommandManager(CommandQueueFamily::Graphics, true);
+	s_Data->GraphicsCommandManager = new VulkanCommandManager(CommandQueueFamily::Graphics, true);
 
 	for (auto& image : swapchainImages)
 		s_Data->Framebuffers.push_back(new VulkanFramebuffer({ image }, s_Data->Pipeline->GetRenderPassHandle(), s_Data->Swapchain->GetSize()));
 
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		s_Data->Fences.emplace_back(true);
-		s_Data->CommandBuffers.emplace_back(s_Data->CommandManager->AllocateCommandBuffer(false));
+		s_Data->Fences.push_back(MakeRef<VulkanFence>(true));
+		s_Data->CommandBuffers.emplace_back(s_Data->GraphicsCommandManager->AllocateCommandBuffer(false));
 	}
 
 	// Texture
@@ -81,16 +80,17 @@ void Renderer::Init()
 	textureSpecs.Size = { 1, 1, 1 };
 	textureSpecs.Format = ImageFormat::R8G8B8A8_UNorm;
 	textureSpecs.Usage = ImageUsage::Sampled | ImageUsage::TransferDst;
-	textureSpecs.Layout = ImageReadAccess::PixelShaderRead;
+	textureSpecs.Layout = ImageLayoutType::CopyDest; // Creating it in CopyDest layout since we're going to write to it
 	s_Data->Texture = new VulkanImage(textureSpecs);
 	s_Data->Sampler = new VulkanSampler(FilterMode::Point, AddressMode::Wrap, CompareOperation::Never, 0.f, 0.f, 1.f);
 
-	auto cmd = s_Data->CommandManager->AllocateCommandBuffer();
+	Ref<VulkanFence> fence = MakeRef<VulkanFence>();
+	auto cmd = s_Data->GraphicsCommandManager->AllocateCommandBuffer();
 	uint32_t color = 0x00ff00ff;
-	cmd.Write(s_Data->Texture, &color, sizeof(uint32_t), ImageLayoutType::Unknown, ImageReadAccess::PixelShaderRead);
+	cmd.Write(s_Data->Texture, &color, sizeof(uint32_t), textureSpecs.Layout, ImageReadAccess::PixelShaderRead);
 	cmd.End();
-	s_Data->CommandManager->Submit(&cmd, 1, nullptr, 0, nullptr, 0, &s_Data->WriteToTextureFence);
-	s_Data->WriteToTextureFence.Wait();
+	s_Data->GraphicsCommandManager->Submit(&cmd, 1, fence, nullptr, 0, nullptr, 0);
+	fence->Wait();
 }
 
 void Renderer::Shutdown()
@@ -102,7 +102,7 @@ void Renderer::Shutdown()
 	delete s_Data->Pipeline;
 	s_Data->CommandBuffers.clear();
 	s_Data->Fences.clear();
-	delete s_Data->CommandManager;
+	delete s_Data->GraphicsCommandManager;
 
 	for (auto& fb : s_Data->Framebuffers)
 		delete fb;
@@ -125,8 +125,8 @@ void Renderer::DrawFrame()
 	auto& fence = s_Data->Fences[s_CurrentFrame];
 	auto& cmd = s_Data->CommandBuffers[s_CurrentFrame];
 
-	fence.Wait();
-	fence.Reset();
+	fence->Wait();
+	fence->Reset();
 
 	uint32_t imageIndex = 0;
 	auto imageAcquireSemaphore = s_Data->Swapchain->AcquireImage(&imageIndex);
@@ -138,7 +138,7 @@ void Renderer::DrawFrame()
 	cmd.EndGraphics();
 	cmd.End();
 
-	s_Data->CommandManager->Submit(&cmd, 1, imageAcquireSemaphore, 1, &semaphore, 1, &fence);
+	s_Data->GraphicsCommandManager->Submit(&cmd, 1, fence, imageAcquireSemaphore, 1, &semaphore, 1);
 	s_Data->Swapchain->Present(&semaphore);
 
 	s_CurrentFrame = (s_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -161,11 +161,16 @@ void Renderer::BeginImGui()
 {
 }
 
+void Renderer::EndImGui()
+{
+}
+
 VulkanContext& Renderer::GetContext()
 {
 	return Application::GetApp().GetWindow().GetRenderContext();
 }
 
-void Renderer::EndImGui()
+VulkanCommandManager* Renderer::GetGraphicsCommandManager()
 {
+	return s_Data->GraphicsCommandManager;
 }

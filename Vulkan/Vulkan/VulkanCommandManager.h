@@ -39,9 +39,12 @@ public:
 	VulkanCommandBuffer AllocateCommandBuffer(bool bBegin = true);
 
 	void Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
+		const Ref<VulkanFence>& signalFence,
 		const VulkanSemaphore* waitSemaphores = nullptr,   uint32_t waitSemaphoresCount = 0,
-		const VulkanSemaphore* signalSemaphores = nullptr, uint32_t signalSemaphoresCount = 0,
-		const VulkanFence* signalFence = nullptr);
+		const VulkanSemaphore* signalSemaphores = nullptr, uint32_t signalSemaphoresCount = 0);
+	void Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
+		const VulkanSemaphore* waitSemaphores = nullptr,   uint32_t waitSemaphoresCount = 0,
+		const VulkanSemaphore* signalSemaphores = nullptr, uint32_t signalSemaphoresCount = 0);
 
 private:
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;

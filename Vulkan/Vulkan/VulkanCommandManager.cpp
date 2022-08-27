@@ -77,14 +77,10 @@ VulkanCommandBuffer VulkanCommandManager::AllocateCommandBuffer(bool bBegin)
 }
 
 void VulkanCommandManager::Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
+	const Ref<VulkanFence>& signalFence,
 	const VulkanSemaphore* waitSemaphores, uint32_t waitSemaphoresCount,
-	const VulkanSemaphore* signalSemaphores, uint32_t signalSemaphoresCount,
-	const VulkanFence* signalFence)
+	const VulkanSemaphore* signalSemaphores, uint32_t signalSemaphoresCount)
 {
-	bool bOwnsFence = signalFence == nullptr;
-	if (bOwnsFence)
-		signalFence = new VulkanFence();
-
 	std::vector<VkCommandBuffer> vkCmdBuffers(cmdBuffersCount);
 	for (uint32_t i = 0; i < cmdBuffersCount; ++i)
 	{
@@ -124,6 +120,14 @@ void VulkanCommandManager::Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdB
 	info.pWaitDstStageMask = vkDstStageMask.data();
 
 	VK_CHECK(vkQueueSubmit(m_Queue, 1, &info, signalFence->GetVulkanFence()));
+}
+
+void VulkanCommandManager::Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
+	const VulkanSemaphore* waitSemaphores, uint32_t waitSemaphoresCount,
+	const VulkanSemaphore* signalSemaphores, uint32_t signalSemaphoresCount)
+{
+	Submit(cmdBuffers, cmdBuffersCount, MakeRef<VulkanFence>(),
+		waitSemaphores, waitSemaphoresCount, signalSemaphores, signalSemaphoresCount);
 }
 
 //------------------

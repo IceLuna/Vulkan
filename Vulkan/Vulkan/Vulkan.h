@@ -3,6 +3,22 @@
 #include <vulkan/vulkan.h>
 #include <iostream>
 #include <cassert>
+#include <memory>
+
+template<typename T>
+using Ref = std::shared_ptr<T>;
+
+template<typename Type, class... Args>
+constexpr Ref<Type> MakeRef(Args&&... args)
+{
+	return std::make_shared<Type>(std::forward<Args>(args)...);
+}
+
+template<typename ToType, typename FromType>
+constexpr Ref<ToType> Cast(const Ref<FromType>& ref)
+{
+	return std::dynamic_pointer_cast<ToType>(ref);
+}
 
 inline const char* VKResultToString(VkResult result)
 {
