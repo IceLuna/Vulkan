@@ -165,6 +165,9 @@ struct ImageLayout
     ImageLayout() = default;
     ImageLayout(ImageLayoutType type) : LayoutType(type) {}
     ImageLayout(ImageReadAccess readAccessFlags) : LayoutType(ImageLayoutType::ReadOnly), ReadAccessFlags(readAccessFlags) {}
+
+    bool operator==(const ImageLayout& other) const { return LayoutType == other.LayoutType && ReadAccessFlags == other.ReadAccessFlags; }
+    bool operator!=(const ImageLayout& other) const { return !(*this == other); }
 };
 
 struct ImageView

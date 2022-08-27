@@ -83,7 +83,6 @@ public:
     void* Map();
     void Unmap();
 
-    //void Write(VulkanCommandBuffer* cmd, const ImageView& imageView, const void* data, ImageLayout initialLayout, ImageLayout finalLayout);
     void Read(void* data, size_t size, ImageLayout initialLayout, ImageLayout finalLayout);
 
     VkFormat GetVulkanFormat() const { return m_VulkanFormat; }

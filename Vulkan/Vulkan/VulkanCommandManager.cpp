@@ -4,6 +4,7 @@
 #include "VulkanFramebuffer.h"
 #include "VulkanImage.h"
 #include "VulkanBuffer.h"
+#include "VulkanStagingManager.h"
 #include "VulkanShader.h"
 
 static uint32_t SelectQueueFamilyIndex(CommandQueueFamily queueFamily, const QueueFamilyIndices& indices)
@@ -75,14 +76,30 @@ VulkanCommandBuffer VulkanCommandManager::AllocateCommandBuffer(bool bBegin)
 	return cmd;
 }
 
-void VulkanCommandManager::Submit(const VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
+void VulkanCommandManager::Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
 	const VulkanSemaphore* waitSemaphores, uint32_t waitSemaphoresCount,
 	const VulkanSemaphore* signalSemaphores, uint32_t signalSemaphoresCount,
 	const VulkanFence* signalFence)
 {
+	bool bOwnsFence = signalFence == nullptr;
+	if (bOwnsFence)
+		signalFence = new VulkanFence();
+
 	std::vector<VkCommandBuffer> vkCmdBuffers(cmdBuffersCount);
 	for (uint32_t i = 0; i < cmdBuffersCount; ++i)
-		vkCmdBuffers[i] = (cmdBuffers + i)->m_CommandBuffer;
+	{
+		VulkanCommandBuffer* cmdBuffer = cmdBuffers + i;
+		vkCmdBuffers[i] = cmdBuffer->m_CommandBuffer;
+
+		for (auto& staging : cmdBuffer->m_UsedStagingBuffers)
+		{
+			if (staging->GetState() == StagingBufferState::Pending)
+			{
+				staging->SetFence(signalFence);
+				staging->SetState(StagingBufferState::InFlight);
+			}
+		}
+	}
 
 	std::vector<VkSemaphore> vkSignalSemaphores(signalSemaphoresCount);
 	for (uint32_t i = 0; i < signalSemaphoresCount; ++i)
@@ -106,7 +123,7 @@ void VulkanCommandManager::Submit(const VulkanCommandBuffer* cmdBuffers, uint32_
 	info.pSignalSemaphores = vkSignalSemaphores.data();
 	info.pWaitDstStageMask = vkDstStageMask.data();
 
-	VK_CHECK(vkQueueSubmit(m_Queue, 1, &info, signalFence ? signalFence->GetVulkanFence() : VK_NULL_HANDLE));
+	VK_CHECK(vkQueueSubmit(m_Queue, 1, &info, signalFence->GetVulkanFence()));
 }
 
 //------------------
@@ -148,7 +165,7 @@ void VulkanCommandBuffer::End()
 	vkEndCommandBuffer(m_CommandBuffer);
 }
 
-void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline)
+void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline& pipeline)
 {
 	auto& state = pipeline.GetState();
 	m_CurrentGraphicsPipeline = &pipeline;
@@ -199,7 +216,7 @@ void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline)
 	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.m_GraphicsPipeline);
 }
 
-void VulkanCommandBuffer::BeginGraphics(const VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer)
+void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer)
 {
 	auto& state = pipeline.GetState();
 	m_CurrentGraphicsPipeline = &pipeline;
@@ -260,6 +277,7 @@ void VulkanCommandBuffer::EndGraphics()
 
 void VulkanCommandBuffer::Draw(uint32_t vertexCount, uint32_t firstVertex)
 {
+	CommitDescriptors(m_CurrentGraphicsPipeline);
 	vkCmdDraw(m_CommandBuffer, vertexCount, 1, firstVertex, 0);
 }
 
@@ -514,6 +532,34 @@ void VulkanCommandBuffer::CopyImageToBuffer(const VulkanImage* src, VulkanBuffer
 	vkCmdCopyImageToBuffer(m_CommandBuffer, src->GetVulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->GetVulkanBuffer(), uint32_t(regionsCount), imageCopyRegions.data());
 }
 
+void VulkanCommandBuffer::Write(VulkanImage* image, const void* data, size_t size, ImageLayout initialLayout, ImageLayout finalLayout)
+{
+	assert(image->HasUsage(ImageUsage::TransferDst));
+	assert(!image->HasUsage(ImageUsage::DepthStencilAttachment)); // Writing to depth-stencil is not supported
+
+	VulkanStagingBuffer* stagingBuffer = VulkanStagingManager::AcquireBuffer(size, false);
+	m_UsedStagingBuffers.insert(stagingBuffer);
+	void* mapped = stagingBuffer->Map();
+	memcpy(mapped, data, size);
+	stagingBuffer->Unmap();
+
+	if (initialLayout != ImageLayoutType::CopyDest)
+		TransitionLayout(image, initialLayout, ImageLayoutType::CopyDest);
+
+	auto& imageSize = image->GetSize();
+	VkBufferImageCopy region{};
+	region.imageSubresource.aspectMask = image->GetDefaultAspectMask();
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = image->GetLayersCount();
+	region.imageExtent = { imageSize.x, imageSize.y, imageSize.z };
+
+	vkCmdCopyBufferToImage(m_CommandBuffer, stagingBuffer->GetVulkanBuffer(), image->GetVulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+	if (finalLayout != ImageLayoutType::CopyDest)
+		TransitionLayout(image, ImageLayoutType::CopyDest, finalLayout);
+}
+
 void VulkanCommandBuffer::GenerateMips(VulkanImage* image, ImageLayout initialLayout, ImageLayout finalLayout)
 {
 	assert(image->HasUsage(ImageUsage::TransferSrc | ImageUsage::TransferDst));
@@ -569,4 +615,57 @@ void VulkanCommandBuffer::GenerateMips(VulkanImage* image, ImageLayout initialLa
 
 	ImageView lastImageView{ mipCount - 1, 1, 0 };
 	TransitionLayout(image, lastImageView, ImageLayoutType::CopyDest, finalLayout);
+}
+
+void VulkanCommandBuffer::CommitDescriptors(VulkanGraphicsPipeline* pipeline)
+{
+	struct SetData
+	{
+		DescriptorSetData* Data;
+		uint32_t Set;
+	};
+
+	auto& descriptorSetsData = pipeline->GetDescriptorSetsData();
+	std::vector<SetData> dirtyDatas;
+	dirtyDatas.reserve(descriptorSetsData.size());
+	for (auto& it : descriptorSetsData)
+	{
+		if (it.second.IsDirty())
+			dirtyDatas.push_back({ &it.second, it.first });
+	}
+
+	const size_t dirtyDataCount = dirtyDatas.size();
+	std::vector<DescriptorWriteData> writeDatas;
+	writeDatas.reserve(dirtyDataCount);
+
+	// Populating writeData. Allocating DescriptorSet if neccessary
+	auto& descriptorSets = pipeline->GetDescriptorSets();
+	for (size_t i = 0; i < dirtyDataCount; ++i)
+	{
+		uint32_t set = dirtyDatas[i].Set;
+		const VulkanDescriptorSet* currentDescriptorSet = nullptr;
+
+		auto it = descriptorSets.find(set);
+		if (it == descriptorSets.end())
+			currentDescriptorSet = &pipeline->AllocateDescriptorSet(set);
+		else
+			currentDescriptorSet = &it->second;
+
+		assert(currentDescriptorSet);
+		writeDatas.push_back({ currentDescriptorSet, dirtyDatas[i].Data });
+	}
+
+	if (!dirtyDatas.empty())
+		VulkanDescriptorManager::WriteDescriptors(pipeline, writeDatas);
+
+	VkPipelineLayout vkPipelineLayout = pipeline->GetVulkanPipelineLayout();
+	for (auto& it : descriptorSetsData)
+	{
+		uint32_t set = it.first;
+		auto it = descriptorSets.find(set);
+		assert(it != descriptorSets.end());
+		
+		vkCmdBindDescriptorSets(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout,
+			set, 1, &it->second.GetVulkanDescriptorSet(), 0, nullptr);
+	}
 }

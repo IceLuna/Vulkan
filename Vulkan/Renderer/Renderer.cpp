@@ -10,9 +10,11 @@
 #include "../Vulkan/VulkanGraphicsPipeline.h"
 #include "../Vulkan/VulkanSwapchain.h"
 #include "../Vulkan/VulkanFramebuffer.h"
+#include "../Vulkan/VulkanSampler.h"
 #include "../Vulkan/VulkanFence.h"
 #include "../Vulkan/VulkanSemaphore.h"
 #include "../Vulkan/VulkanCommandManager.h"
+#include "../Vulkan/VulkanStagingManager.h"
 #include "../Vulkan/VulkanDescriptorManager.h"
 
 static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
@@ -28,6 +30,10 @@ struct Data
 	std::vector<VulkanCommandBuffer> CommandBuffers;
 	std::vector<VulkanFence> Fences;
 	std::array<VulkanSemaphore, MAX_FRAMES_IN_FLIGHT> Semaphores;
+
+	VulkanFence WriteToTextureFence;
+	VulkanImage* Texture = nullptr;
+	VulkanSampler* Sampler = nullptr;
 };
 
 static Data* s_Data = nullptr;
@@ -69,11 +75,29 @@ void Renderer::Init()
 		s_Data->Fences.emplace_back(true);
 		s_Data->CommandBuffers.emplace_back(s_Data->CommandManager->AllocateCommandBuffer(false));
 	}
+
+	// Texture
+	ImageSpecifications textureSpecs;
+	textureSpecs.Size = { 1, 1, 1 };
+	textureSpecs.Format = ImageFormat::R8G8B8A8_UNorm;
+	textureSpecs.Usage = ImageUsage::Sampled | ImageUsage::TransferDst;
+	textureSpecs.Layout = ImageReadAccess::PixelShaderRead;
+	s_Data->Texture = new VulkanImage(textureSpecs);
+	s_Data->Sampler = new VulkanSampler(FilterMode::Point, AddressMode::Wrap, CompareOperation::Never, 0.f, 0.f, 1.f);
+
+	auto cmd = s_Data->CommandManager->AllocateCommandBuffer();
+	uint32_t color = 0x00ff00ff;
+	cmd.Write(s_Data->Texture, &color, sizeof(uint32_t), ImageLayoutType::Unknown, ImageReadAccess::PixelShaderRead);
+	cmd.End();
+	s_Data->CommandManager->Submit(&cmd, 1, nullptr, 0, nullptr, 0, &s_Data->WriteToTextureFence);
+	s_Data->WriteToTextureFence.Wait();
 }
 
 void Renderer::Shutdown()
 {
 	VulkanContext::GetDevice()->WaitIdle();
+
+	VulkanStagingManager::ReleaseBuffers();
 
 	delete s_Data->Pipeline;
 	s_Data->CommandBuffers.clear();
@@ -83,6 +107,9 @@ void Renderer::Shutdown()
 	for (auto& fb : s_Data->Framebuffers)
 		delete fb;
 	s_Data->Framebuffers.clear();
+
+	delete s_Data->Texture;
+	delete s_Data->Sampler;
 
 	delete s_Data;
 	s_Data = nullptr;
@@ -104,6 +131,7 @@ void Renderer::DrawFrame()
 	uint32_t imageIndex = 0;
 	auto imageAcquireSemaphore = s_Data->Swapchain->AcquireImage(&imageIndex);
 
+	s_Data->Pipeline->SetImageSampler(s_Data->Texture, s_Data->Sampler, 0, 0);
 	cmd.Begin();
 	cmd.BeginGraphics(*s_Data->Pipeline, *s_Data->Framebuffers[imageIndex]);
 	cmd.Draw(3, 0);

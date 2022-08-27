@@ -33,7 +33,7 @@ public:
 		other.m_Fence = VK_NULL_HANDLE;
 	}
 
-	VulkanFence& operator= (VulkanFence&& other) noexcept
+	VulkanFence& operator=(VulkanFence&& other) noexcept
 	{
 		if (m_Fence)
 			vkDestroyFence(m_Device, m_Fence, nullptr);
@@ -43,6 +43,8 @@ public:
 
 		other.m_Device = VK_NULL_HANDLE;
 		other.m_Fence = VK_NULL_HANDLE;
+
+		return *this;
 	}
 
 	const VkFence& GetVulkanFence() const { return m_Fence; }

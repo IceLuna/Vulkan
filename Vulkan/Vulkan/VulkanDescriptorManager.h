@@ -11,7 +11,7 @@ class VulkanDescriptorSet;
 struct DescriptorWriteData
 {
 	const VulkanDescriptorSet* DescriptorSet = nullptr;
-	const DescriptorSetData* DescriptorSetData = nullptr;
+	DescriptorSetData* DescriptorSetData = nullptr;
 };
 
 class VulkanDescriptorManager
@@ -63,7 +63,7 @@ public:
 	}
 
 	uint32_t GetSetIndex() const { return m_SetIndex; }
-	VkDescriptorSet GetVulkanDescriptorSet() const { return m_DescriptorSet; }
+	const VkDescriptorSet& GetVulkanDescriptorSet() const { return m_DescriptorSet; }
 
 private:
 	VulkanDescriptorSet(const VulkanGraphicsPipeline* pipeline, VkDescriptorPool pool, uint32_t set);

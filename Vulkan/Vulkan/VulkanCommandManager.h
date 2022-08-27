@@ -7,6 +7,7 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include <unordered_set>
 
 enum class CommandQueueFamily
 {
@@ -20,6 +21,7 @@ class VulkanGraphicsPipeline;
 class VulkanFramebuffer;
 class VulkanImage;
 class VulkanBuffer;
+class VulkanStagingBuffer;
 
 class VulkanCommandManager
 {
@@ -36,7 +38,7 @@ public:
 
 	VulkanCommandBuffer AllocateCommandBuffer(bool bBegin = true);
 
-	void Submit(const VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
+	void Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
 		const VulkanSemaphore* waitSemaphores = nullptr,   uint32_t waitSemaphoresCount = 0,
 		const VulkanSemaphore* signalSemaphores = nullptr, uint32_t signalSemaphoresCount = 0,
 		const VulkanFence* signalFence = nullptr);
@@ -98,8 +100,8 @@ public:
 	void Begin();
 	void End();
 
-	void BeginGraphics(const VulkanGraphicsPipeline& pipeline);
-	void BeginGraphics(const VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer);
+	void BeginGraphics(VulkanGraphicsPipeline& pipeline);
+	void BeginGraphics(VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer);
 	void EndGraphics();
 	void Draw(uint32_t vertexCount, uint32_t firstVertex);
 
@@ -123,14 +125,20 @@ public:
 	void CopyBufferToImage(const VulkanBuffer* src, VulkanImage* dst, const std::vector<BufferImageCopy>& regions);
 	void CopyImageToBuffer(const VulkanImage* src, VulkanBuffer* dst, const std::vector<BufferImageCopy>& regions);
 
+	// TODO: Implement writing to all mips
+	void Write(VulkanImage* image, const void* data, size_t size, ImageLayout initialLayout, ImageLayout finalLayout);
+
 	void GenerateMips(VulkanImage* image, ImageLayout initialLayout, ImageLayout finalLayout);
 
+	void CommitDescriptors(VulkanGraphicsPipeline* pipeline);
+
 private:
+	std::unordered_set<VulkanStagingBuffer*> m_UsedStagingBuffers;
 	VkDevice m_Device = VK_NULL_HANDLE;
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 	VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
 	VkQueueFlags m_QueueFlags;
-	const VulkanGraphicsPipeline* m_CurrentGraphicsPipeline = nullptr;
+	VulkanGraphicsPipeline* m_CurrentGraphicsPipeline = nullptr;
 
 	friend class VulkanCommandManager;
 };

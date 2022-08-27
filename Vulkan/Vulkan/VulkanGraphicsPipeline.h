@@ -133,11 +133,22 @@ public:
 	void SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding);
 	void SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding);
 
-	void CommitDescriptors();
 	const std::vector<VkDescriptorSetLayoutBinding>& GetSetBindings(uint32_t set) const { return m_SetBindings[set]; }
 
 	VkDescriptorSetLayout GetDescriptorSetLayout(uint32_t set) const { assert(set < m_SetLayouts.size()); return m_SetLayouts[set]; }
 	VkPipelineLayout GetVulkanPipelineLayout() const { return m_PipelineLayout; }
+
+private:
+	const std::unordered_map<uint32_t, VulkanDescriptorSet>& GetDescriptorSets() const { return m_DescriptorSets; }
+	const std::unordered_map<uint32_t, DescriptorSetData>& GetDescriptorSetsData() const { return m_DescriptorSetData; }
+	std::unordered_map<uint32_t, DescriptorSetData>& GetDescriptorSetsData() { return m_DescriptorSetData; }
+
+	VulkanDescriptorSet& AllocateDescriptorSet(uint32_t set)
+	{
+		VulkanDescriptorSet& nonInitializedSet = m_DescriptorSets[set];
+		nonInitializedSet = VulkanDescriptorManager::AllocateDescriptorSet(this, set);
+		return nonInitializedSet;
+	}
 
 private:
 	GraphicsPipelineState m_State;

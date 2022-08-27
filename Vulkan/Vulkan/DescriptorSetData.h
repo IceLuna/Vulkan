@@ -81,7 +81,7 @@ public:
 public:
 	const std::unordered_map<uint32_t, Binding>& GetBindings() const { return m_Bindings; }
 	bool IsDirty() const { return m_bDirty; }
-	void OnFlushed() const { m_bDirty = false; }
+	void OnFlushed() { m_bDirty = false; }
 
 	void SetArg(std::uint32_t idx, const VulkanBuffer* buffer);
 	void SetArg(std::uint32_t idx, const VulkanBuffer* buffer, std::size_t offset, std::size_t size);
@@ -100,5 +100,5 @@ public:
 
 private:
 	std::unordered_map<uint32_t, Binding> m_Bindings; // Binding -> Data
-	mutable bool m_bDirty = true; // Mutable because SetIsDirty called from a function that receives const vector of `DescriptorSetData&`
+	bool m_bDirty = true;
 };

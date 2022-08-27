@@ -114,6 +114,7 @@
     <ClCompile Include="Vulkan\VulkanMemoryAllocator\vk_mem_alloc.cpp" />
     <ClCompile Include="Vulkan\VulkanPipelineCache.cpp" />
     <ClCompile Include="Vulkan\VulkanShader.cpp" />
+    <ClCompile Include="Vulkan\VulkanStagingManager.cpp" />
     <ClCompile Include="Vulkan\VulkanSwapchain.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -151,6 +152,7 @@
     <ClInclude Include="Vulkan\VulkanSampler.h" />
     <ClInclude Include="Vulkan\VulkanSemaphore.h" />
     <ClInclude Include="Vulkan\VulkanShader.h" />
+    <ClInclude Include="Vulkan\VulkanStagingManager.h" />
     <ClInclude Include="Vulkan\VulkanSwapchain.h" />
     <ClInclude Include="Vulkan\VulkanUtils.h" />
   </ItemGroup>
