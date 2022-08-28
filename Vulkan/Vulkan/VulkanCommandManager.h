@@ -31,7 +31,18 @@ public:
 	virtual ~VulkanCommandManager();
 
 	VulkanCommandManager(const VulkanCommandManager&) = delete;
-	VulkanCommandManager(VulkanCommandManager&& other) noexcept { m_CommandPool = other.m_CommandPool; other.m_CommandPool = VK_NULL_HANDLE; }
+	VulkanCommandManager(VulkanCommandManager&& other) noexcept
+	{
+		m_CommandPool = other.m_CommandPool;
+		m_Queue = other.m_Queue;
+		m_QueueFlags = other.m_QueueFlags;
+		m_QueueFamilyIndex = other.m_QueueFamilyIndex;
+
+		other.m_CommandPool = VK_NULL_HANDLE;
+		other.m_Queue = VK_NULL_HANDLE;
+		other.m_QueueFlags = 0;
+		other.m_QueueFamilyIndex = uint32_t(-1);
+	}
 
 	VulkanCommandManager& operator=(const VulkanCommandManager&) = delete;
 	VulkanCommandManager& operator=(VulkanCommandManager&& other) noexcept = delete;
@@ -49,7 +60,7 @@ public:
 private:
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 	VkQueue m_Queue = VK_NULL_HANDLE;
-	VkQueueFlags m_QueueFlags;
+	VkQueueFlags m_QueueFlags = 0;
 	uint32_t m_QueueFamilyIndex = uint32_t(-1);
 
 	friend class VulkanCommandBuffer;

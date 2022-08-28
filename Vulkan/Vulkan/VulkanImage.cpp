@@ -97,6 +97,9 @@ VkImageView VulkanImage::GetVulkanImageView(const ImageView& viewInfo) const
 	if (it != m_Views.end())
 		return it->second;
 
+	if (!m_Image)
+		return VK_NULL_HANDLE;
+
 	VkImageView& imageView = m_Views[viewInfo];
 	VkImageViewCreateInfo viewCI{};
 	viewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;

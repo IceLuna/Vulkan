@@ -21,40 +21,6 @@ struct ImageSpecifications
     bool bIsCube = false;
 };
 
-static uint32_t CalculateMipCount(glm::uvec2 size)
-{
-    return (uint32_t)std::floor(std::log2(std::max(size.x, size.y))) + 1;
-}
-
-static uint32_t CalculateMipCount(const glm::uvec3& size)
-{
-    uint32_t maxSide = std::max(size.x, size.y);
-    maxSide = std::max(maxSide, size.z);
-    return (uint32_t)std::floor(std::log2(maxSide)) + 1;
-}
-
-template <class T>
-inline void HashCombine(std::size_t& seed, const T& v)
-{
-    std::hash<T> hasher;
-    seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
-
-namespace std
-{
-    template<>
-    struct hash<ImageView>
-    {
-        std::size_t operator()(const ImageView& view) const noexcept
-        {
-            std::size_t result = std::hash<uint32_t>()(view.MipLevel);
-            HashCombine(result, view.Layer);
-
-            return result;
-        }
-    };
-}
-
 class VulkanImage
 {
 public:

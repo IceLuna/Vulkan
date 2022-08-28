@@ -57,6 +57,11 @@ enum class ImageFormat
     R8G8B8A8_UInt,
     R8G8B8A8_SNorm,
     R8G8B8A8_SInt,
+    R8G8B8_UNorm,
+    R8G8B8_UNorm_SRGB,
+    R8G8B8_UInt,
+    R8G8B8_SNorm,
+    R8G8B8_SInt,
     R16G16_Float,
     R16G16_UNorm,
     R16G16_UInt,
@@ -68,6 +73,7 @@ enum class ImageFormat
     R32_SInt,
     D24_UNorm_S8_UInt,
     R8G8_UNorm,
+    R8G8_UNorm_SRGB,
     R8G8_UInt,
     R8G8_SNorm,
     R8G8_SInt,
@@ -77,6 +83,7 @@ enum class ImageFormat
     R16_UInt,
     R16_SNorm,
     R16_SInt,
+    R8_UNorm_SRGB,
     R8_UNorm,
     R8_UInt,
     R8_SNorm,
@@ -188,6 +195,28 @@ struct ImageView
         return !((*this) == other);
     }
 };
+
+template <class T>
+inline void HashCombine(std::size_t& seed, const T& v)
+{
+    std::hash<T> hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+namespace std
+{
+    template<>
+    struct hash<ImageView>
+    {
+        std::size_t operator()(const ImageView& view) const noexcept
+        {
+            std::size_t result = std::hash<uint32_t>()(view.MipLevel);
+            HashCombine(result, view.Layer);
+
+            return result;
+        }
+    };
+}
 
 enum class BufferUsage
 {
@@ -373,3 +402,111 @@ struct BufferImageCopy
     // Specifies extent of image region in pixels.
     glm::uvec3 ImageExtent;
 };
+
+// Returns bits
+static uint32_t GetImageFormatBPP(ImageFormat format)
+{
+	switch (format)
+	{
+        case ImageFormat::R32G32B32A32_Float :      return 4 * 32;
+        case ImageFormat::R32G32B32A32_UInt :       return 4 * 32;
+        case ImageFormat::R32G32B32A32_SInt :       return 4 * 32;
+        case ImageFormat::R32G32B32_Float :         return 3 * 32;
+        case ImageFormat::R32G32B32_UInt :          return 3 * 32;
+        case ImageFormat::R32G32B32_SInt :          return 3 * 32;
+        case ImageFormat::R16G16B16A16_Float :      return 4 * 16;
+        case ImageFormat::R16G16B16A16_UNorm :      return 4 * 16;
+        case ImageFormat::R16G16B16A16_UInt :       return 4 * 16;
+        case ImageFormat::R16G16B16A16_SNorm :      return 4 * 16;
+        case ImageFormat::R16G16B16A16_SInt :       return 4 * 16;
+        case ImageFormat::R32G32_Float :            return 2 * 32;
+        case ImageFormat::R32G32_UInt :             return 2 * 32;
+        case ImageFormat::R32G32_SInt :             return 2 * 32;
+        case ImageFormat::D32_Float_S8X24_UInt :    return 64;
+        case ImageFormat::R10G10B10A2_UNorm :       return 32;
+        case ImageFormat::R10G10B10A2_UInt :        return 32;
+        case ImageFormat::R11G11B10_Float :         return 32;
+        case ImageFormat::R8G8B8A8_UNorm :          return 4 * 8;
+        case ImageFormat::R8G8B8A8_UNorm_SRGB :     return 4 * 8;
+        case ImageFormat::R8G8B8A8_UInt :           return 4 * 8;
+        case ImageFormat::R8G8B8A8_SNorm :          return 4 * 8;
+        case ImageFormat::R8G8B8A8_SInt :           return 4 * 8;
+        case ImageFormat::R8G8B8_UNorm :            return 3 * 8;
+        case ImageFormat::R8G8B8_UNorm_SRGB :       return 3 * 8;
+        case ImageFormat::R8G8B8_UInt :             return 3 * 8;
+        case ImageFormat::R8G8B8_SNorm :            return 3 * 8;
+        case ImageFormat::R8G8B8_SInt :             return 3 * 8;
+        case ImageFormat::R16G16_Float :            return 2 * 16;
+        case ImageFormat::R16G16_UNorm :            return 2 * 16;
+        case ImageFormat::R16G16_UInt :             return 2 * 16;
+        case ImageFormat::R16G16_SNorm :            return 2 * 16;
+        case ImageFormat::R16G16_SInt :             return 2 * 16;
+        case ImageFormat::D32_Float :               return 32;
+        case ImageFormat::R32_Float :               return 32;
+        case ImageFormat::R32_UInt :                return 32;
+        case ImageFormat::R32_SInt :                return 32;
+        case ImageFormat::D24_UNorm_S8_UInt :       return 32;
+        case ImageFormat::R8G8_UNorm :              return 2 * 8;
+        case ImageFormat::R8G8_UNorm_SRGB :         return 2 * 8;
+        case ImageFormat::R8G8_UInt :               return 2 * 8;
+        case ImageFormat::R8G8_SNorm :              return 2 * 8;
+        case ImageFormat::R8G8_SInt :               return 2 * 8;
+        case ImageFormat::R16_Float :               return 16;
+        case ImageFormat::D16_UNorm :               return 16;
+        case ImageFormat::R16_UNorm :               return 16;
+        case ImageFormat::R16_UInt :                return 16;
+        case ImageFormat::R16_SNorm :               return 16;
+        case ImageFormat::R16_SInt :                return 16;
+        case ImageFormat::R8_UNorm_SRGB:            return 8;
+        case ImageFormat::R8_UNorm :                return 8;
+        case ImageFormat::R8_UInt :                 return 8;
+        case ImageFormat::R8_SNorm :                return 8;
+        case ImageFormat::R8_SInt :                 return 8;
+        case ImageFormat::R9G9B9E5_SharedExp :      return 32;
+        case ImageFormat::R8G8_B8G8_UNorm :         return 4 * 8;
+        case ImageFormat::G8R8_G8B8_UNorm :         return 4 * 8;
+        case ImageFormat::BC1_UNorm :               return 4;
+        case ImageFormat::BC1_UNorm_SRGB :          return 4;
+        case ImageFormat::BC2_UNorm :               return 8;
+        case ImageFormat::BC2_UNorm_SRGB :          return 8;
+        case ImageFormat::BC3_UNorm :               return 8;
+        case ImageFormat::BC3_UNorm_SRGB :          return 8;
+        case ImageFormat::BC4_UNorm :               return 4;
+        case ImageFormat::BC4_SNorm :               return 4;
+        case ImageFormat::BC5_UNorm :               return 8;
+        case ImageFormat::BC5_SNorm :               return 8;
+        case ImageFormat::B5G6R5_UNorm :            return 16;
+        case ImageFormat::B5G5R5A1_UNorm :          return 16;
+        case ImageFormat::B8G8R8A8_UNorm :          return 4 * 8;
+        case ImageFormat::B8G8R8A8_UNorm_SRGB :     return 4 * 8;
+        case ImageFormat::BC6H_UFloat16 :           return 8;
+        case ImageFormat::BC6H_SFloat16 :           return 8;
+        case ImageFormat::BC7_UNorm :               return 8;
+        case ImageFormat::BC7_UNorm_SRGB:           return 8;
+	}
+    assert(!"Unknown format");
+	return 0;
+}
+
+static uint32_t CalculateMipCount(uint32_t width, uint32_t height)
+{
+    return (uint32_t)std::floor(std::log2(glm::max(width, height))) + 1;
+}
+
+static uint32_t CalculateMipCount(glm::uvec2 size)
+{
+    return (uint32_t)std::floor(std::log2(glm::max(size.x, size.y))) + 1;
+}
+
+static uint32_t CalculateMipCount(const glm::uvec3& size)
+{
+    uint32_t maxSide = glm::max(size.x, size.y);
+    maxSide = glm::max(maxSide, size.z);
+    return (uint32_t)std::floor(std::log2(maxSide)) + 1;
+}
+
+static size_t CalculateImageMemorySize(ImageFormat format, uint32_t width, uint32_t height)
+{
+    return ((size_t)GetImageFormatBPP(format) / 8) * (size_t)width * (size_t)height;
+}
+

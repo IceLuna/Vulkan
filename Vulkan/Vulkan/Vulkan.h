@@ -4,9 +4,12 @@
 #include <iostream>
 #include <cassert>
 #include <memory>
+#include <filesystem>
 
 template<typename T>
 using Ref = std::shared_ptr<T>;
+
+using Path = std::filesystem::path;
 
 template<typename Type, class... Args>
 constexpr Ref<Type> MakeRef(Args&&... args)

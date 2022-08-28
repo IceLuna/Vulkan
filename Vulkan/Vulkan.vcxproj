@@ -101,6 +101,7 @@
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="Vulkan\DescriptorSetData.cpp" />
     <ClCompile Include="Vulkan\VulkanAllocator.cpp" />
     <ClCompile Include="Vulkan\VulkanBuffer.cpp" />
@@ -116,6 +117,7 @@
     <ClCompile Include="Vulkan\VulkanShader.cpp" />
     <ClCompile Include="Vulkan\VulkanStagingManager.cpp" />
     <ClCompile Include="Vulkan\VulkanSwapchain.cpp" />
+    <ClCompile Include="Vulkan\VulkanTexture2D.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\vendor\imgui\backends\imgui_impl_glfw.h" />
@@ -154,6 +156,7 @@
     <ClInclude Include="Vulkan\VulkanShader.h" />
     <ClInclude Include="Vulkan\VulkanStagingManager.h" />
     <ClInclude Include="Vulkan\VulkanSwapchain.h" />
+    <ClInclude Include="Vulkan\VulkanTexture2D.h" />
     <ClInclude Include="Vulkan\VulkanUtils.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,6 @@
 #include "Renderer.h"
-#include "../Core/Application.h"
 
-#include <array>
+#include "../Core/Application.h"
 
 #include "../Vulkan/VulkanContext.h"
 #include "../Vulkan/VulkanDevice.h"
@@ -10,12 +9,13 @@
 #include "../Vulkan/VulkanGraphicsPipeline.h"
 #include "../Vulkan/VulkanSwapchain.h"
 #include "../Vulkan/VulkanFramebuffer.h"
-#include "../Vulkan/VulkanSampler.h"
+#include "../Vulkan/VulkanTexture2D.h"
 #include "../Vulkan/VulkanFence.h"
 #include "../Vulkan/VulkanSemaphore.h"
 #include "../Vulkan/VulkanCommandManager.h"
 #include "../Vulkan/VulkanStagingManager.h"
-#include "../Vulkan/VulkanDescriptorManager.h"
+
+#include <array>
 
 static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
 static uint32_t s_CurrentFrame = 0;
@@ -31,8 +31,7 @@ struct Data
 	std::vector<Ref<VulkanFence>> Fences;
 	std::array<VulkanSemaphore, MAX_FRAMES_IN_FLIGHT> Semaphores;
 
-	VulkanImage* Texture = nullptr;
-	VulkanSampler* Sampler = nullptr;
+	VulkanTexture2D* Texture = nullptr;
 };
 
 static Data* s_Data = nullptr;
@@ -76,21 +75,7 @@ void Renderer::Init()
 	}
 
 	// Texture
-	ImageSpecifications textureSpecs;
-	textureSpecs.Size = { 1, 1, 1 };
-	textureSpecs.Format = ImageFormat::R8G8B8A8_UNorm;
-	textureSpecs.Usage = ImageUsage::Sampled | ImageUsage::TransferDst;
-	textureSpecs.Layout = ImageLayoutType::CopyDest; // Creating it in CopyDest layout since we're going to write to it
-	s_Data->Texture = new VulkanImage(textureSpecs);
-	s_Data->Sampler = new VulkanSampler(FilterMode::Point, AddressMode::Wrap, CompareOperation::Never, 0.f, 0.f, 1.f);
-
-	Ref<VulkanFence> fence = MakeRef<VulkanFence>();
-	auto cmd = s_Data->GraphicsCommandManager->AllocateCommandBuffer();
-	uint32_t color = 0x00ff00ff;
-	cmd.Write(s_Data->Texture, &color, sizeof(uint32_t), textureSpecs.Layout, ImageReadAccess::PixelShaderRead);
-	cmd.End();
-	s_Data->GraphicsCommandManager->Submit(&cmd, 1, fence, nullptr, 0, nullptr, 0);
-	fence->Wait();
+	s_Data->Texture = new VulkanTexture2D("Textures/pika.png");
 }
 
 void Renderer::Shutdown()
@@ -109,7 +94,6 @@ void Renderer::Shutdown()
 	s_Data->Framebuffers.clear();
 
 	delete s_Data->Texture;
-	delete s_Data->Sampler;
 
 	delete s_Data;
 	s_Data = nullptr;
@@ -131,10 +115,10 @@ void Renderer::DrawFrame()
 	uint32_t imageIndex = 0;
 	auto imageAcquireSemaphore = s_Data->Swapchain->AcquireImage(&imageIndex);
 
-	s_Data->Pipeline->SetImageSampler(s_Data->Texture, s_Data->Sampler, 0, 0);
+	s_Data->Pipeline->SetImageSampler(s_Data->Texture->GetImage(), s_Data->Texture->GetSampler(), 0, 0);
 	cmd.Begin();
 	cmd.BeginGraphics(*s_Data->Pipeline, *s_Data->Framebuffers[imageIndex]);
-	cmd.Draw(3, 0);
+	cmd.Draw(6, 0);
 	cmd.EndGraphics();
 	cmd.End();
 
