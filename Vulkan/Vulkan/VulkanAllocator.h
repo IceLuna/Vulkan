@@ -15,7 +15,7 @@ enum class MemoryType;
 class VulkanAllocator
 {
 public:
-	static void Init(const VulkanDevice* device);
+	static void Init();
 	static void Shutdown();
 
 	[[nodiscard]] static VmaAllocation AllocateBuffer(const VkBufferCreateInfo* bufferCI, MemoryType usage, bool bSeparateAllocation, VkBuffer* outBuffer);
@@ -26,7 +26,7 @@ public:
 	static void DestroyBuffer(VkBuffer buffer, VmaAllocation allocation);
 
 	static bool IsHostVisible(VmaAllocation allocation);
-	static void* MapMemory(VmaAllocation allocation);
+	[[nodiscard]] static void* MapMemory(VmaAllocation allocation);
 	static void UnmapMemory(VmaAllocation allocation);
 	static void FlushMemory(VmaAllocation allocation);
 

@@ -118,6 +118,7 @@ public:
 	void BeginGraphics(VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer);
 	void EndGraphics();
 	void Draw(uint32_t vertexCount, uint32_t firstVertex);
+	void DrawIndexed(const VulkanBuffer* vertexBuffer, const VulkanBuffer* indexBuffer, uint32_t indexCount, uint32_t firstIndex, uint32_t vertexOffset);
 
 	void SetGraphicsRootConstants(const void* vertexRootConstants, const void* fragmentRootConstants);
 
@@ -134,6 +135,7 @@ public:
 	void StorageBufferBarrier(VulkanBuffer* buffer) { TransitionLayout(buffer, BufferLayoutType::StorageBuffer, BufferLayoutType::StorageBuffer); }
 	void TransitionLayout(VulkanBuffer* buffer, BufferLayout oldLayout, BufferLayout newLayout);
 	void CopyBuffer(const VulkanBuffer* src, VulkanBuffer* dst, size_t srcOffset, size_t dstOffset, size_t size);
+	void CopyBuffer(const VulkanStagingBuffer* src, VulkanBuffer* dst, size_t srcOffset, size_t dstOffset, size_t size);
 	void FillBuffer(VulkanBuffer* dst, uint32_t data, size_t offset = 0, size_t numBytes = 0);
 
 	void CopyBufferToImage(const VulkanBuffer* src, VulkanImage* dst, const std::vector<BufferImageCopy>& regions);
@@ -141,6 +143,7 @@ public:
 
 	// TODO: Implement writing to all mips
 	void Write(VulkanImage* image, const void* data, size_t size, ImageLayout initialLayout, ImageLayout finalLayout);
+	void Write(VulkanBuffer* buffer, const void* data, size_t size, size_t offset, BufferLayout initialLayout, BufferLayout finalLayout);
 
 	void GenerateMips(VulkanImage* image, ImageLayout initialLayout, ImageLayout finalLayout);
 

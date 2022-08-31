@@ -367,6 +367,14 @@ enum class Topology
     Points
 };
 
+enum class CullMode
+{
+    None,
+    Front,
+    Back,
+    FrontAndBack
+};
+
 struct BufferImageCopy
 {
     // Buffer offset, in bytes.

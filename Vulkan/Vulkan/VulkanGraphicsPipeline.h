@@ -24,33 +24,34 @@ struct ShaderSpecializationInfo
 	size_t Size = 0;
 };
 
+struct Attachment
+{
+	VulkanImage* Image = nullptr;
+
+	ImageLayout InitialLayout;
+	ImageLayout FinalLayout;
+
+	bool bClearEnabled = false;
+	bool bBlendEnabled = false;
+};
+
+struct ColorAttachment : Attachment
+{
+	glm::vec4 ClearColor{ 0.f };
+	BlendState BlendingState;
+};
+
+struct DepthStencilAttachment : Attachment
+{
+	float DepthClearValue = 0.f;
+	uint32_t StencilClearValue = 0;
+	CompareOperation DepthCompareOp = CompareOperation::Never;
+	bool bWriteDepth = false;
+};
+
 struct GraphicsPipelineState
 {
 public:
-	struct Attachment
-	{
-		VulkanImage* Image = nullptr;
-
-		ImageLayout InitialLayout;
-		ImageLayout FinalLayout;
-
-		bool bClearEnabled = false;
-		bool bBlendEnabled = false;
-	};
-
-	struct ColorAttachment : Attachment
-	{
-		glm::vec4 ClearColor{ 0.f };
-		BlendState BlendingState;
-	};
-
-	struct DepthStencilAttachment : Attachment
-	{
-		float DepthClearValue = 0.f;
-		uint32_t StencilClearValue = 0;
-		bool bWriteDepth = false;
-		CompareOperation DepthCompareOp = CompareOperation::Never;
-	};
 
 	struct VertexInputAttribute
 	{
@@ -68,6 +69,7 @@ public:
 	VulkanShader* GeometryShader = nullptr; // Optional
 	DepthStencilAttachment DepthStencilAttachment;
 	Topology Topology = Topology::Triangles;
+	CullMode CullMode = CullMode::None;
 	float LineWidth = 1.5f;
 	bool bEnableConservativeRasterization = false;
 
@@ -103,6 +105,7 @@ private:
 class VulkanBuffer;
 class VulkanImage;
 class VulkanSampler;
+class VulkanTexture2D;
 class VulkanGraphicsPipeline
 {
 public:
@@ -129,6 +132,8 @@ public:
 
 	void SetSampler(const VulkanSampler* sampler, uint32_t set, uint32_t binding);
 	void SetImageSampler(const VulkanImage* image, const VulkanSampler* sampler, uint32_t set, uint32_t binding);
+	void SetImageSampler(const VulkanTexture2D* texture, uint32_t set, uint32_t binding);
+	void SetImageSampler(const VulkanTexture2D* texture, const ImageView& imageView, uint32_t set, uint32_t binding);
 	void SetImageSampler(const VulkanImage* image, const ImageView& imageView, const VulkanSampler* sampler, uint32_t set, uint32_t binding);
 	void SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding);
 	void SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding);

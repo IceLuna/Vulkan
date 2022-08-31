@@ -35,7 +35,7 @@ static VkQueueFlags GetQueueFlags(CommandQueueFamily queueFamily)
 {
 	switch (queueFamily)
 	{
-		case CommandQueueFamily::Graphics: return VK_QUEUE_GRAPHICS_BIT;
+		case CommandQueueFamily::Graphics: return VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT;
 		case CommandQueueFamily::Compute:  return VK_QUEUE_COMPUTE_BIT;
 		case CommandQueueFamily::Transfer: return VK_QUEUE_TRANSFER_BIT;
 	}
@@ -285,6 +285,21 @@ void VulkanCommandBuffer::Draw(uint32_t vertexCount, uint32_t firstVertex)
 	vkCmdDraw(m_CommandBuffer, vertexCount, 1, firstVertex, 0);
 }
 
+void VulkanCommandBuffer::DrawIndexed(const VulkanBuffer* vertexBuffer, const VulkanBuffer* indexBuffer, uint32_t indexCount, uint32_t firstIndex, uint32_t vertexOffset)
+{
+	assert(vertexBuffer->HasUsage(BufferUsage::VertexBuffer));
+	assert(indexBuffer->HasUsage(BufferUsage::IndexBuffer));
+	CommitDescriptors(m_CurrentGraphicsPipeline);
+
+	VkDeviceSize offsets[] = { 0, 0 };
+	VkBuffer vkVertex = vertexBuffer->GetVulkanBuffer();
+	VkBuffer vkIndex = indexBuffer->GetVulkanBuffer();
+	vkCmdBindVertexBuffers(m_CommandBuffer, 0, 1, &vkVertex, offsets);
+	vkCmdBindIndexBuffer(m_CommandBuffer, vkIndex, 0, VK_INDEX_TYPE_UINT32);
+
+	vkCmdDrawIndexed(m_CommandBuffer, indexCount, 1, firstIndex, vertexOffset, 0);
+}
+
 void VulkanCommandBuffer::SetGraphicsRootConstants(const void* vertexRootConstants, const void* fragmentRootConstants)
 {
 	assert(m_CurrentGraphicsPipeline);
@@ -464,6 +479,11 @@ void VulkanCommandBuffer::CopyBuffer(const VulkanBuffer* src, VulkanBuffer* dst,
 	vkCmdCopyBuffer(m_CommandBuffer, src->GetVulkanBuffer(), dst->GetVulkanBuffer(), 1, &region);
 }
 
+void VulkanCommandBuffer::CopyBuffer(const VulkanStagingBuffer* src, VulkanBuffer* dst, size_t srcOffset, size_t dstOffset, size_t size)
+{
+	CopyBuffer(src->GetBuffer(), dst, srcOffset, dstOffset, size);
+}
+
 void VulkanCommandBuffer::FillBuffer(VulkanBuffer* dst, uint32_t data, size_t offset, size_t numBytes)
 {
 	assert(dst->HasUsage(BufferUsage::TransferDst));
@@ -562,6 +582,26 @@ void VulkanCommandBuffer::Write(VulkanImage* image, const void* data, size_t siz
 
 	if (finalLayout != ImageLayoutType::CopyDest)
 		TransitionLayout(image, ImageLayoutType::CopyDest, finalLayout);
+}
+
+void VulkanCommandBuffer::Write(VulkanBuffer* buffer, const void* data, size_t size, size_t offset, BufferLayout initialLayout, BufferLayout finalLayout)
+{
+	assert(buffer);
+	assert(buffer->HasUsage(BufferUsage::TransferDst));
+
+	VulkanStagingBuffer* stagingBuffer = VulkanStagingManager::AcquireBuffer(size, false);
+	m_UsedStagingBuffers.insert(stagingBuffer);
+	void* mapped = stagingBuffer->Map();
+	memcpy(mapped, data, size);
+	stagingBuffer->Unmap();
+
+	if (initialLayout != BufferLayoutType::CopyDest)
+		TransitionLayout(buffer, initialLayout, BufferLayoutType::CopyDest);
+
+	CopyBuffer(stagingBuffer, buffer, 0, offset, size);
+
+	if (finalLayout != BufferLayoutType::CopyDest)
+		TransitionLayout(buffer, BufferLayoutType::CopyDest, finalLayout);
 }
 
 void VulkanCommandBuffer::GenerateMips(VulkanImage* image, ImageLayout initialLayout, ImageLayout finalLayout)

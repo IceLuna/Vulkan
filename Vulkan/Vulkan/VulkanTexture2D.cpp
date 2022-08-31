@@ -129,14 +129,14 @@ bool VulkanTexture2D::Load(Path& path)
 
 	if (stbi_is_hdr(cpath))
 	{
-		m_ImageData.Data = stbi_loadf(cpath, &width, &height, &channels, 0);
-		m_Format = HDRChannelsToFormat(channels);
+		m_ImageData.Data = stbi_loadf(cpath, &width, &height, &channels, 4);
+		m_Format = HDRChannelsToFormat(4);
 		m_ImageData.Size = CalculateImageMemorySize(m_Format, uint32_t(width), uint32_t(height));
 	}
 	else
 	{
-		m_ImageData.Data = stbi_load(cpath, &width, &height, &channels, 0);
-		m_Format = ChannelsToFormat(channels, m_Specs.bSRGB);
+		m_ImageData.Data = stbi_load(cpath, &width, &height, &channels, 4);
+		m_Format = ChannelsToFormat(4, m_Specs.bSRGB);
 		m_ImageData.Size = CalculateImageMemorySize(m_Format, uint32_t(width), uint32_t(height));
 	}
 

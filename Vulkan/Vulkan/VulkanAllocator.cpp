@@ -26,8 +26,9 @@ static VmaMemoryUsage MemoryTypeToVmaUsage(MemoryType memory_type)
 
 static VulkanAllocatorData* s_AllocatorData = nullptr;
 
-void VulkanAllocator::Init(const VulkanDevice* device)
+void VulkanAllocator::Init()
 {
+	const VulkanDevice* device = VulkanContext::GetDevice();
 	s_AllocatorData = new VulkanAllocatorData;
 	s_AllocatorData->Device = device;
 

@@ -64,6 +64,9 @@ public:
 	size_t GetSize() const { return m_Buffer->GetSize(); }
 	bool IsCPURead() const { return m_bIsCPURead; }
 
+	VulkanBuffer* GetBuffer() { return m_Buffer; }
+	const VulkanBuffer* GetBuffer() const { return m_Buffer; }
+
 	VkBuffer GetVulkanBuffer() const { return m_Buffer->GetVulkanBuffer(); }
 
 private:

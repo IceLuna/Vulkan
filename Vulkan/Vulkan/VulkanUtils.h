@@ -529,9 +529,6 @@ inline VkBufferUsageFlags BufferUsageToVulkan(BufferUsage usage)
 {
 	VkBufferUsageFlags res = 0;
 
-	// We don't need a separate usage in BufferUsage enum for VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT 
-	// because we use it only with buffers used in raytracing: scratch, instance, vertex and index buffers.
-	// So add this usage implicitly for those usages.
 	if ((usage & BufferUsage::TransferSrc) == BufferUsage::TransferSrc)
 	{
 		res |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -572,16 +569,12 @@ inline VkBufferUsageFlags BufferUsageToVulkan(BufferUsage usage)
 	{
 		res |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 		usage &= ~BufferUsage::IndexBuffer;
-
-		res |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 	}
 
 	if ((usage & BufferUsage::VertexBuffer) == BufferUsage::VertexBuffer)
 	{
 		res |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		usage &= ~BufferUsage::VertexBuffer;
-
-		res |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 	}
 
 	if ((usage & BufferUsage::IndirectBuffer) == BufferUsage::IndirectBuffer)
@@ -594,8 +587,6 @@ inline VkBufferUsageFlags BufferUsageToVulkan(BufferUsage usage)
 	{
 		res |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
 		usage &= ~BufferUsage::RayTracing;
-
-		res |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 	}
 
 	if ((usage & BufferUsage::AccelerationStructure) == BufferUsage::AccelerationStructure)
@@ -604,8 +595,7 @@ inline VkBufferUsageFlags BufferUsageToVulkan(BufferUsage usage)
 		usage &= ~BufferUsage::AccelerationStructure;
 	}
 
-	if ((usage & BufferUsage::AccelerationStructureBuildInput)
-		== BufferUsage::AccelerationStructureBuildInput)
+	if ((usage & BufferUsage::AccelerationStructureBuildInput) == BufferUsage::AccelerationStructureBuildInput)
 	{
 		res |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
 		usage &= ~BufferUsage::AccelerationStructureBuildInput;
@@ -769,6 +759,20 @@ inline VkCompareOp CompareOpToVulkan(CompareOperation compareOp)
 		default:
 			assert(!"Unsupported compare op");
 			return VK_COMPARE_OP_NEVER;
+	}
+}
+
+inline VkCullModeFlags CullModeToVulkan(CullMode mode)
+{
+	switch (mode)
+	{
+		case CullMode::None			: return VK_CULL_MODE_NONE;
+		case CullMode::Front		: return VK_CULL_MODE_FRONT_BIT;
+		case CullMode::Back			: return VK_CULL_MODE_BACK_BIT;
+		case CullMode::FrontAndBack : return VK_CULL_MODE_FRONT_AND_BACK;
+		default:
+			assert(!"Unsupported cull mode");
+			return VK_CULL_MODE_NONE;
 	}
 }
 

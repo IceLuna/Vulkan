@@ -98,10 +98,12 @@
     <ClCompile Include="..\vendor\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Core\Application.cpp" />
     <ClCompile Include="Core\FileSystem.cpp" />
+    <ClCompile Include="Core\Mesh.cpp" />
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="stb_image.cpp" />
+    <ClCompile Include="tiny_obj_loader.cpp" />
     <ClCompile Include="Vulkan\DescriptorSetData.cpp" />
     <ClCompile Include="Vulkan\VulkanAllocator.cpp" />
     <ClCompile Include="Vulkan\VulkanBuffer.cpp" />
@@ -132,6 +134,7 @@
     <ClInclude Include="Core\DataBuffer.h" />
     <ClInclude Include="Core\EnumUtils.h" />
     <ClInclude Include="Core\FileSystem.h" />
+    <ClInclude Include="Core\Mesh.h" />
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Renderer\RendererUtils.h" />

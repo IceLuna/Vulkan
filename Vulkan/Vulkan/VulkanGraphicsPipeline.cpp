@@ -3,7 +3,7 @@
 #include "VulkanPipelineCache.h"
 #include "VulkanDescriptorManager.h"
 #include "VulkanSwapchain.h"
-#include "VulkanImage.h"
+#include "VulkanTexture2D.h"
 #include "VulkanBuffer.h"
 #include "VulkanSampler.h"
 
@@ -89,8 +89,8 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 	rasterization.rasterizerDiscardEnable = VK_FALSE; // No geometry passes rasterization stage if set to TRUE
 	rasterization.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterization.lineWidth = state.LineWidth;
-	rasterization.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterization.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterization.cullMode = CullModeToVulkan(state.CullMode);
+	rasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterization.pNext = (state.bEnableConservativeRasterization && bDeviceSupportsConservativeRasterization) ? &conservativeRasterizationCI : nullptr;
 
 	if (state.bEnableConservativeRasterization && !bDeviceSupportsConservativeRasterization)
@@ -300,8 +300,22 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 	renderPassCI.subpassCount = 1;
 	VK_CHECK(vkCreateRenderPass(device, &renderPassCI, nullptr, &m_RenderPass));
 
-	m_Width = colorAttachmentsCount ? state.ColorAttachments[0].Image->GetSize().x : 0;
-	m_Height = colorAttachmentsCount ? state.ColorAttachments[0].Image->GetSize().y : 0;
+	if (colorAttachmentsCount)
+	{
+		auto& size = state.ColorAttachments[0].Image->GetSize();
+		m_Width  = size.x;
+		m_Height = size.y;
+	}
+	else if (depthStencilImage)
+	{
+		auto& size = depthStencilImage->GetSize();
+		m_Width  = size.x;
+		m_Height = size.y;
+	}
+	else
+	{
+		m_Width = m_Height = 0;
+	}
 
 	VkFramebufferCreateInfo framebufferCI{};
 	framebufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -484,6 +498,16 @@ void VulkanGraphicsPipeline::SetSampler(const VulkanSampler* sampler, uint32_t s
 void VulkanGraphicsPipeline::SetImageSampler(const VulkanImage* image, const VulkanSampler* sampler, uint32_t set, uint32_t binding)
 {
 	m_DescriptorSetData[set].SetArg(binding, image, sampler);
+}
+
+void VulkanGraphicsPipeline::SetImageSampler(const VulkanTexture2D* texture, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, texture->GetImage(), texture->GetSampler());
+}
+
+void VulkanGraphicsPipeline::SetImageSampler(const VulkanTexture2D* texture, const ImageView& imageView, uint32_t set, uint32_t binding)
+{
+	m_DescriptorSetData[set].SetArg(binding, texture->GetImage(), imageView, texture->GetSampler());
 }
 
 void VulkanGraphicsPipeline::SetImageSampler(const VulkanImage* image, const ImageView& imageView, const VulkanSampler* sampler, uint32_t set, uint32_t binding)
