@@ -108,6 +108,12 @@
     <ClCompile Include="..\vendor\imgui\imgui_impl_vulkan_with_textures.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Vulkan\VulkanPipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Vulkan\VulkanComputePipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Window.h">
@@ -230,9 +236,16 @@
     <ClInclude Include="..\vendor\imgui\imgui_impl_vulkan_with_textures.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Vulkan\VulkanPipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Vulkan\VulkanComputePipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\basic.vert" />
     <None Include="Shaders\basic.frag" />
+    <None Include="Shaders\basic.comp" />
   </ItemGroup>
 </Project>

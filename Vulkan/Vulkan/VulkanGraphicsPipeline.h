@@ -3,26 +3,11 @@
 #include "Vulkan.h"
 #include "VulkanUtils.h"
 #include "VulkanShader.h"
-#include "VulkanDescriptorManager.h"
-#include "DescriptorSetData.h"
+#include "VulkanPipeline.h"
 
 #include <glm/glm.hpp>
 #include <vector>
 #include <unordered_map>
-
-struct ShaderSpecializationMapEntry
-{
-	uint32_t ConstantID = 0;
-	uint32_t Offset = 0;
-	size_t   Size = 0;
-};
-
-struct ShaderSpecializationInfo
-{
-	std::vector<ShaderSpecializationMapEntry> MapEntries;
-	const void* Data = nullptr;
-	size_t Size = 0;
-};
 
 struct Attachment
 {
@@ -52,7 +37,6 @@ struct DepthStencilAttachment : Attachment
 struct GraphicsPipelineState
 {
 public:
-
 	struct VertexInputAttribute
 	{
 		uint32_t Location = 0;
@@ -102,11 +86,7 @@ private:
 	static constexpr SamplesCount s_InvalidSamplesCount = static_cast<SamplesCount>(-1);
 };
 
-class VulkanBuffer;
-class VulkanImage;
-class VulkanSampler;
-class VulkanTexture2D;
-class VulkanGraphicsPipeline
+class VulkanGraphicsPipeline : public VulkanPipeline
 {
 public:
 	VulkanGraphicsPipeline(const GraphicsPipelineState& state, const VulkanGraphicsPipeline* parentPipeline = nullptr);
@@ -121,46 +101,10 @@ public:
 	uint32_t GetWidth() const { return m_Width; }
 	uint32_t GetHeight() const { return m_Height; }
 
-	void SetBuffer(const VulkanBuffer* buffer, uint32_t set, uint32_t binding);
-	void SetBuffer(const VulkanBuffer* buffer, size_t offset, size_t size, uint32_t set, uint32_t binding);
-	void SetBufferArray(const std::vector<const VulkanBuffer*>& buffers, uint32_t set, uint32_t binding);
-
-	void SetImage(const VulkanImage* image, uint32_t set, uint32_t binding);
-	void SetImage(const VulkanImage* image, const ImageView& imageView, uint32_t set, uint32_t binding);
-	void SetImageArray(const std::vector<const VulkanImage*>& images, uint32_t set, uint32_t binding);
-	void SetImageArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, uint32_t set, uint32_t binding);
-
-	void SetSampler(const VulkanSampler* sampler, uint32_t set, uint32_t binding);
-	void SetImageSampler(const VulkanImage* image, const VulkanSampler* sampler, uint32_t set, uint32_t binding);
-	void SetImageSampler(const VulkanTexture2D* texture, uint32_t set, uint32_t binding);
-	void SetImageSampler(const VulkanTexture2D* texture, const ImageView& imageView, uint32_t set, uint32_t binding);
-	void SetImageSampler(const VulkanImage* image, const ImageView& imageView, const VulkanSampler* sampler, uint32_t set, uint32_t binding);
-	void SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding);
-	void SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding);
-
-	const std::vector<VkDescriptorSetLayoutBinding>& GetSetBindings(uint32_t set) const { return m_SetBindings[set]; }
-
-	VkDescriptorSetLayout GetDescriptorSetLayout(uint32_t set) const { assert(set < m_SetLayouts.size()); return m_SetLayouts[set]; }
-	VkPipelineLayout GetVulkanPipelineLayout() const { return m_PipelineLayout; }
-
-private:
-	const std::unordered_map<uint32_t, VulkanDescriptorSet>& GetDescriptorSets() const { return m_DescriptorSets; }
-	const std::unordered_map<uint32_t, DescriptorSetData>& GetDescriptorSetsData() const { return m_DescriptorSetData; }
-	std::unordered_map<uint32_t, DescriptorSetData>& GetDescriptorSetsData() { return m_DescriptorSetData; }
-
-	VulkanDescriptorSet& AllocateDescriptorSet(uint32_t set)
-	{
-		VulkanDescriptorSet& nonInitializedSet = m_DescriptorSets[set];
-		nonInitializedSet = VulkanDescriptorManager::AllocateDescriptorSet(this, set);
-		return nonInitializedSet;
-	}
+	virtual VkPipelineLayout GetVulkanPipelineLayout() const override { return m_PipelineLayout; }
 
 private:
 	GraphicsPipelineState m_State;
-	std::vector<std::vector<VkDescriptorSetLayoutBinding>> m_SetBindings; // Not owned! Set -> Bindings
-	std::vector<VkDescriptorSetLayout> m_SetLayouts;
-	std::unordered_map<uint32_t, DescriptorSetData> m_DescriptorSetData; // Set -> Data
-	std::unordered_map<uint32_t, VulkanDescriptorSet> m_DescriptorSets; // Set -> DescriptorSet
 	VkPipeline m_GraphicsPipeline = VK_NULL_HANDLE;
 	VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 	VkFramebuffer m_Framebuffer = VK_NULL_HANDLE;

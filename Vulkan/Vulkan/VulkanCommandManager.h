@@ -18,6 +18,8 @@ enum class CommandQueueFamily
 
 class VulkanCommandBuffer;
 class VulkanGraphicsPipeline;
+class VulkanComputePipeline;
+class VulkanPipeline;
 class VulkanFramebuffer;
 class VulkanImage;
 class VulkanBuffer;
@@ -114,8 +116,10 @@ public:
 	void Begin();
 	void End();
 
-	void BeginGraphics(VulkanGraphicsPipeline& pipeline);
-	void BeginGraphics(VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer);
+	void Dispatch(VulkanComputePipeline* pipeline, uint32_t numGroupsX, uint32_t numGroupsY, uint32_t numGroupsZ, const void* pushConstants);
+
+	void BeginGraphics(VulkanGraphicsPipeline* pipeline);
+	void BeginGraphics(VulkanGraphicsPipeline* pipeline, const VulkanFramebuffer& framebuffer);
 	void EndGraphics();
 	void Draw(uint32_t vertexCount, uint32_t firstVertex);
 	void DrawIndexed(const VulkanBuffer* vertexBuffer, const VulkanBuffer* indexBuffer, uint32_t indexCount, uint32_t firstIndex, uint32_t vertexOffset);
@@ -147,9 +151,10 @@ public:
 
 	void GenerateMips(VulkanImage* image, ImageLayout initialLayout, ImageLayout finalLayout);
 
-	void CommitDescriptors(VulkanGraphicsPipeline* pipeline);
-
 	VkCommandBuffer GetVulkanCommandBuffer() const { return m_CommandBuffer; }
+
+private:
+	void CommitDescriptors(VulkanPipeline* pipeline, VkPipelineBindPoint bindPoint);
 
 private:
 	std::unordered_set<VulkanStagingBuffer*> m_UsedStagingBuffers;

@@ -301,7 +301,7 @@ void Renderer::DrawFrame(float ts)
 
 	s_Data->Pipeline->SetImageSampler(s_Data->Texture, 0, 0);
 	cmd.Begin();
-	cmd.BeginGraphics(*s_Data->Pipeline, *s_Data->Framebuffers[imageIndex]);
+	cmd.BeginGraphics(s_Data->Pipeline, *s_Data->Framebuffers[imageIndex]);
 	cmd.SetGraphicsRootConstants(&pushData, nullptr);
 	cmd.DrawIndexed(s_Data->VertexBuffer, s_Data->IndexBuffer, (uint32_t)s_Data->Mesh->GetIndices().size(), 0, 0);
 	EndImGui(&cmd);
@@ -325,7 +325,7 @@ void Renderer::DrawImGui()
 
 	const auto textureID = ImGui_ImplVulkan_AddTexture(sampler, imageView, layout);
 
-	ImGui::Image(textureID, { 1000, 1000 });
+	ImGui::Image(textureID, { 256, 256 });
 	ImGui::End();
 }
 

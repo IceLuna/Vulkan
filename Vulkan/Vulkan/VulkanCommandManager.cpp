@@ -1,6 +1,7 @@
 #include "VulkanCommandManager.h"
 #include "VulkanContext.h"
 #include "VulkanGraphicsPipeline.h"
+#include "VulkanComputePipeline.h"
 #include "VulkanFramebuffer.h"
 #include "VulkanImage.h"
 #include "VulkanBuffer.h"
@@ -169,10 +170,25 @@ void VulkanCommandBuffer::End()
 	vkEndCommandBuffer(m_CommandBuffer);
 }
 
-void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline& pipeline)
+void VulkanCommandBuffer::Dispatch(VulkanComputePipeline* pipeline, uint32_t numGroupsX, uint32_t numGroupsY, uint32_t numGroupsZ, const void* pushConstants)
 {
-	auto& state = pipeline.GetState();
-	m_CurrentGraphicsPipeline = &pipeline;
+	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->GetVulkanPipeline());
+	CommitDescriptors(pipeline, VK_PIPELINE_BIND_POINT_COMPUTE);
+
+	if (pushConstants)
+	{
+		auto& ranges = pipeline->m_State.ComputeShader->GetPushConstantRanges();
+		assert(ranges.size());
+		vkCmdPushConstants(m_CommandBuffer, pipeline->GetVulkanPipelineLayout(), ranges[0].stageFlags, ranges[0].offset, ranges[0].size, &pushConstants);
+	}
+
+	vkCmdDispatch(m_CommandBuffer, numGroupsX, numGroupsY, numGroupsZ);
+}
+
+void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline* pipeline)
+{
+	auto& state = pipeline->GetState();
+	m_CurrentGraphicsPipeline = pipeline;
 
 	size_t usedResolveAttachmentsCount = std::count_if(state.ResolveAttachments.begin(), state.ResolveAttachments.end(), [](const auto& attachment) { return attachment.Image; });
 	std::vector<VkClearValue> clearValues(state.ColorAttachments.size() + usedResolveAttachmentsCount);
@@ -199,31 +215,31 @@ void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline& pipeline)
 
 	VkRenderPassBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	beginInfo.renderPass = pipeline.m_RenderPass;
-	beginInfo.framebuffer = pipeline.m_Framebuffer;
+	beginInfo.renderPass = pipeline->m_RenderPass;
+	beginInfo.framebuffer = pipeline->m_Framebuffer;
 	beginInfo.clearValueCount = uint32_t(clearValues.size());
 	beginInfo.pClearValues = clearValues.data();
-	beginInfo.renderArea.extent = { pipeline.m_Width, pipeline.m_Height };
+	beginInfo.renderArea.extent = { pipeline->m_Width, pipeline->m_Height };
 	vkCmdBeginRenderPass(m_CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	VkViewport viewport{};
-	viewport.width  = float(pipeline.m_Width);
-	viewport.height = float(pipeline.m_Height);
+	viewport.width  = float(pipeline->m_Width);
+	viewport.height = float(pipeline->m_Height);
 	viewport.minDepth = 0.f;
 	viewport.maxDepth = 1.f;
 	vkCmdSetViewport(m_CommandBuffer, 0, 1, &viewport);
 
 	VkRect2D scissor{};
-	scissor.extent = { pipeline.m_Width, pipeline.m_Height };
+	scissor.extent = { pipeline->m_Width, pipeline->m_Height };
 	vkCmdSetScissor(m_CommandBuffer, 0, 1, &scissor);
 
-	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.m_GraphicsPipeline);
+	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_GraphicsPipeline);
 }
 
-void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline& pipeline, const VulkanFramebuffer& framebuffer)
+void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline* pipeline, const VulkanFramebuffer& framebuffer)
 {
-	auto& state = pipeline.GetState();
-	m_CurrentGraphicsPipeline = &pipeline;
+	auto& state = pipeline->GetState();
+	m_CurrentGraphicsPipeline = pipeline;
 
 	size_t usedResolveAttachmentsCount = std::count_if(state.ResolveAttachments.begin(), state.ResolveAttachments.end(), [](const auto& attachment) { return attachment.Image; });
 	std::vector<VkClearValue> clearValues(state.ColorAttachments.size() + usedResolveAttachmentsCount);
@@ -251,13 +267,13 @@ void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline& pipeline, const 
 	glm::uvec2 size = framebuffer.GetSize();
 	VkRenderPassBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	beginInfo.renderPass = pipeline.m_RenderPass;
+	beginInfo.renderPass = pipeline->m_RenderPass;
 	beginInfo.framebuffer = framebuffer.GetVulkanFramebuffer();
 	beginInfo.clearValueCount = uint32_t(clearValues.size());
 	beginInfo.pClearValues = clearValues.data();
 	beginInfo.renderArea.extent = { size.x, size.y };
 	vkCmdBeginRenderPass(m_CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.m_GraphicsPipeline);
+	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_GraphicsPipeline);
 
 	VkViewport viewport{};
 	viewport.width = float(size.x);
@@ -281,7 +297,7 @@ void VulkanCommandBuffer::EndGraphics()
 
 void VulkanCommandBuffer::Draw(uint32_t vertexCount, uint32_t firstVertex)
 {
-	CommitDescriptors(m_CurrentGraphicsPipeline);
+	CommitDescriptors(m_CurrentGraphicsPipeline, VK_PIPELINE_BIND_POINT_GRAPHICS);
 	vkCmdDraw(m_CommandBuffer, vertexCount, 1, firstVertex, 0);
 }
 
@@ -289,7 +305,7 @@ void VulkanCommandBuffer::DrawIndexed(const VulkanBuffer* vertexBuffer, const Vu
 {
 	assert(vertexBuffer->HasUsage(BufferUsage::VertexBuffer));
 	assert(indexBuffer->HasUsage(BufferUsage::IndexBuffer));
-	CommitDescriptors(m_CurrentGraphicsPipeline);
+	CommitDescriptors(m_CurrentGraphicsPipeline, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
 	VkDeviceSize offsets[] = { 0, 0 };
 	VkBuffer vkVertex = vertexBuffer->GetVulkanBuffer();
@@ -662,7 +678,7 @@ void VulkanCommandBuffer::GenerateMips(VulkanImage* image, ImageLayout initialLa
 	TransitionLayout(image, lastImageView, ImageLayoutType::CopyDest, finalLayout);
 }
 
-void VulkanCommandBuffer::CommitDescriptors(VulkanGraphicsPipeline* pipeline)
+void VulkanCommandBuffer::CommitDescriptors(VulkanPipeline* pipeline, VkPipelineBindPoint bindPoint)
 {
 	struct SetData
 	{
@@ -710,7 +726,7 @@ void VulkanCommandBuffer::CommitDescriptors(VulkanGraphicsPipeline* pipeline)
 		auto it = descriptorSets.find(set);
 		assert(it != descriptorSets.end());
 		
-		vkCmdBindDescriptorSets(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout,
+		vkCmdBindDescriptorSets(m_CommandBuffer, bindPoint, vkPipelineLayout,
 			set, 1, &it->second.GetVulkanDescriptorSet(), 0, nullptr);
 	}
 }

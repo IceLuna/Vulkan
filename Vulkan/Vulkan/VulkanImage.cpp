@@ -14,11 +14,13 @@ VulkanImage::VulkanImage(const ImageSpecifications& specs) : m_Specs(specs)
 	CreateImage();
 	CreateImageView();
 
+	Ref<VulkanFence> fence = MakeRef<VulkanFence>(); // TODO: Remove when RenderGraph is implemented
 	auto commandManager = Renderer::GetGraphicsCommandManager();
 	auto cmd = commandManager->AllocateCommandBuffer();
 	cmd.TransitionLayout(this, ImageLayoutType::Unknown, m_Specs.Layout);
 	cmd.End();
-	commandManager->Submit(&cmd, 1, nullptr, 0, nullptr, 0);
+	commandManager->Submit(&cmd, 1, fence, nullptr, 0, nullptr, 0);
+	fence->Wait();
 }
 
 VulkanImage::VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns)

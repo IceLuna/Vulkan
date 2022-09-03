@@ -67,6 +67,11 @@ static void MergeDescriptorSetLayoutBindings(std::vector<std::vector<VkDescripto
 VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& state, const VulkanGraphicsPipeline* parentPipeline)
 	: m_State(state)
 {
+	assert(state.VertexShader->GetType() == ShaderType::Vertex);
+	assert(state.FragmentShader->GetType() == ShaderType::Fragment);
+	if (state.GeometryShader)
+		assert(state.GeometryShader->GetType() == ShaderType::Geometry);
+
 	const VkDevice device = VulkanContext::GetDevice()->GetVulkanDevice();
 	const size_t colorAttachmentsCount = state.ColorAttachments.size();
 	const bool bDeviceSupportsConservativeRasterization = VulkanContext::GetDevice()->GetPhysicalDevice()->GetExtensionSupport().SupportsConservativeRasterization;
@@ -360,11 +365,11 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 		for (auto& entry : state.FragmentSpecializationInfo.MapEntries)
 			fragmentMapEntries.emplace_back(VkSpecializationMapEntry{ entry.ConstantID, entry.Offset, entry.Size });
 
-		vertexSpecializationInfo.pData = state.FragmentSpecializationInfo.Data;
-		vertexSpecializationInfo.dataSize = state.FragmentSpecializationInfo.Size;
-		vertexSpecializationInfo.mapEntryCount = (uint32_t)mapEntriesCount;
-		vertexSpecializationInfo.pMapEntries = fragmentMapEntries.data();
-		stages[1].pSpecializationInfo = &vertexSpecializationInfo;
+		fragmentSpecializationInfo.pData = state.FragmentSpecializationInfo.Data;
+		fragmentSpecializationInfo.dataSize = state.FragmentSpecializationInfo.Size;
+		fragmentSpecializationInfo.mapEntryCount = (uint32_t)mapEntriesCount;
+		fragmentSpecializationInfo.pMapEntries = fragmentMapEntries.data();
+		stages[1].pSpecializationInfo = &fragmentSpecializationInfo;
 	}
 
 	// Vertex input
@@ -437,12 +442,6 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 VulkanGraphicsPipeline::~VulkanGraphicsPipeline()
 {
 	VkDevice device = VulkanContext::GetDevice()->GetVulkanDevice();
-	for (auto& setLayout : m_SetLayouts)
-		vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
-
-	m_SetLayouts.clear();
-	m_DescriptorSets.clear();
-	m_DescriptorSetData.clear();
 
 	vkDestroyPipeline(device, m_GraphicsPipeline, nullptr);
 	vkDestroyRenderPass(device, m_RenderPass, nullptr);
@@ -454,74 +453,3 @@ VulkanGraphicsPipeline::~VulkanGraphicsPipeline()
 	m_Framebuffer = VK_NULL_HANDLE;
 	m_PipelineLayout = VK_NULL_HANDLE;
 }
-
-void VulkanGraphicsPipeline::SetBuffer(const VulkanBuffer* buffer, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, buffer);
-}
-
-void VulkanGraphicsPipeline::SetBuffer(const VulkanBuffer* buffer, size_t offset, size_t size, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, buffer, offset, size);
-}
-
-void VulkanGraphicsPipeline::SetBufferArray(const std::vector<const VulkanBuffer*>& buffers, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArgArray(binding, buffers);
-}
-
-void VulkanGraphicsPipeline::SetImage(const VulkanImage* image, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, image);
-}
-
-void VulkanGraphicsPipeline::SetImage(const VulkanImage* image, const ImageView& imageView, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, image, imageView);
-}
-
-void VulkanGraphicsPipeline::SetImageArray(const std::vector<const VulkanImage*>& images, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArgArray(binding, images);
-}
-
-void VulkanGraphicsPipeline::SetImageArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArgArray(binding, images, imageViews);
-}
-
-void VulkanGraphicsPipeline::SetSampler(const VulkanSampler* sampler, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, sampler);
-}
-
-void VulkanGraphicsPipeline::SetImageSampler(const VulkanImage* image, const VulkanSampler* sampler, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, image, sampler);
-}
-
-void VulkanGraphicsPipeline::SetImageSampler(const VulkanTexture2D* texture, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, texture->GetImage(), texture->GetSampler());
-}
-
-void VulkanGraphicsPipeline::SetImageSampler(const VulkanTexture2D* texture, const ImageView& imageView, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, texture->GetImage(), imageView, texture->GetSampler());
-}
-
-void VulkanGraphicsPipeline::SetImageSampler(const VulkanImage* image, const ImageView& imageView, const VulkanSampler* sampler, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, image, imageView, sampler);
-}
-
-void VulkanGraphicsPipeline::SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArgArray(binding, images, samplers);
-}
-
-void VulkanGraphicsPipeline::SetImageSamplerArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, const std::vector<const VulkanSampler*>& samplers, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArgArray(binding, images, imageViews, samplers);
-}
-

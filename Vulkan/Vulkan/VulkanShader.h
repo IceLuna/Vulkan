@@ -14,6 +14,20 @@ enum class ShaderType
 	Compute
 };
 
+struct ShaderSpecializationMapEntry
+{
+	uint32_t ConstantID = 0;
+	uint32_t Offset = 0;
+	size_t   Size = 0;
+};
+
+struct ShaderSpecializationInfo
+{
+	std::vector<ShaderSpecializationMapEntry> MapEntries;
+	const void* Data = nullptr;
+	size_t Size = 0;
+};
+
 using ShaderDefines = std::vector<std::pair<std::string, std::string>>;
 
 class VulkanShader
@@ -27,6 +41,8 @@ public:
 
 	const std::vector<VkPushConstantRange>& GetPushConstantRanges() const { return m_PushConstantRanges; }
 	const std::vector<std::vector<VkDescriptorSetLayoutBinding>>& GeLayoutSetBindings() const { return m_LayoutBindings; }
+
+	ShaderType GetType() const { return m_Type; }
 
 private:
 	void Reload();

@@ -5,7 +5,7 @@
 
 #include <vector>
 
-class VulkanGraphicsPipeline;
+class VulkanPipeline;
 class VulkanDescriptorSet;
 
 struct DescriptorWriteData
@@ -22,8 +22,8 @@ private:
 public:
 	static void Init();
 	static void Shutdown();
-	static VulkanDescriptorSet AllocateDescriptorSet(const VulkanGraphicsPipeline* pipeline, uint32_t set);
-	static void WriteDescriptors(const VulkanGraphicsPipeline* pipeline, const std::vector<DescriptorWriteData>& writeDatas);
+	static VulkanDescriptorSet AllocateDescriptorSet(const VulkanPipeline* pipeline, uint32_t set);
+	static void WriteDescriptors(const VulkanPipeline* pipeline, const std::vector<DescriptorWriteData>& writeDatas);
 };
 
 class VulkanDescriptorSet
@@ -66,7 +66,7 @@ public:
 	const VkDescriptorSet& GetVulkanDescriptorSet() const { return m_DescriptorSet; }
 
 private:
-	VulkanDescriptorSet(const VulkanGraphicsPipeline* pipeline, VkDescriptorPool pool, uint32_t set);
+	VulkanDescriptorSet(const VulkanPipeline* pipeline, VkDescriptorPool pool, uint32_t set);
 
 private:
 	VkDevice m_Device = VK_NULL_HANDLE;

@@ -1,6 +1,6 @@
 #include "VulkanDescriptorManager.h"
 #include "VulkanContext.h"
-#include "VulkanGraphicsPipeline.h"
+#include "VulkanPipeline.h"
 
 #include <iostream>
 #include <string>
@@ -47,16 +47,40 @@ void VulkanDescriptorManager::Shutdown()
     s_Device = VK_NULL_HANDLE;
 }
 
-VulkanDescriptorSet VulkanDescriptorManager::AllocateDescriptorSet(const VulkanGraphicsPipeline* pipeline, uint32_t set)
+VulkanDescriptorSet VulkanDescriptorManager::AllocateDescriptorSet(const VulkanPipeline* pipeline, uint32_t set)
 {
     return VulkanDescriptorSet(pipeline, s_DescriptorPool, set);
 }
 
-void VulkanDescriptorManager::WriteDescriptors(const VulkanGraphicsPipeline* pipeline, const std::vector<DescriptorWriteData>& writeDatas)
+void VulkanDescriptorManager::WriteDescriptors(const VulkanPipeline* pipeline, const std::vector<DescriptorWriteData>& writeDatas)
 {
     std::vector<VkDescriptorBufferInfo> buffers;
     std::vector<VkDescriptorImageInfo> images;
     std::vector<VkWriteDescriptorSet> vkWriteDescriptorSets;
+    size_t buffersInfoCount = 0;
+    size_t imagesInfoCount = 0;
+
+    for (auto& writeData : writeDatas)
+    {
+        uint32_t set = writeData.DescriptorSet->GetSetIndex();
+        const auto& setBindings = pipeline->GetSetBindings(set);
+        const auto& setBindingsData = writeData.DescriptorSetData->GetBindings();
+
+        for (auto& binding : setBindings)
+        {
+            const auto& bindingData = setBindingsData.at(binding.binding);
+            
+            if (IsBufferType(binding.descriptorType))
+                buffersInfoCount += binding.descriptorCount;
+            else if (IsImageType(binding.descriptorType))
+                imagesInfoCount += binding.descriptorCount;
+            else if (IsSamplerType(binding.descriptorType))
+                imagesInfoCount += bindingData.ImageBindings[0].Sampler ? 1 : 0;
+        }
+    }
+
+    buffers.reserve(buffersInfoCount);
+    images.reserve(imagesInfoCount);
 
     for (auto& writeData : writeDatas)
     {
@@ -73,6 +97,7 @@ void VulkanDescriptorManager::WriteDescriptors(const VulkanGraphicsPipeline* pip
                 if (bindingData.BufferBindings.empty())
                     continue;
 
+                const size_t startIdx = buffers.size();
                 for (auto& buffer : bindingData.BufferBindings)
                 {
                     VkBuffer vkBuffer = buffer.Buffer ? buffer.Buffer->GetVulkanBuffer() : VK_NULL_HANDLE;
@@ -90,13 +115,14 @@ void VulkanDescriptorManager::WriteDescriptors(const VulkanGraphicsPipeline* pip
                 writeDescriptorSet.descriptorType = binding.descriptorType;
                 writeDescriptorSet.dstBinding = binding.binding;
                 writeDescriptorSet.dstSet = writeData.DescriptorSet->GetVulkanDescriptorSet();
-                writeDescriptorSet.pBufferInfo = buffers.data();
+                writeDescriptorSet.pBufferInfo = &buffers[startIdx];
             }
             else if (IsImageType(binding.descriptorType) || IsSamplerType(binding.descriptorType))
             {
                 if (bindingData.ImageBindings.empty())
                     continue;
 
+                const size_t startIdx = images.size();
                 if (IsSamplerType(binding.descriptorType))
                 {
                     images.push_back({ bindingData.ImageBindings[0].Sampler->GetVulkanSampler(), VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED });
@@ -125,7 +151,7 @@ void VulkanDescriptorManager::WriteDescriptors(const VulkanGraphicsPipeline* pip
                 writeDescriptorSet.descriptorType = binding.descriptorType;
                 writeDescriptorSet.dstBinding = binding.binding;
                 writeDescriptorSet.dstSet = writeData.DescriptorSet->GetVulkanDescriptorSet();
-                writeDescriptorSet.pImageInfo = images.data();
+                writeDescriptorSet.pImageInfo = &images[startIdx];
             }
             else
             {
@@ -143,7 +169,7 @@ void VulkanDescriptorManager::WriteDescriptors(const VulkanGraphicsPipeline* pip
 //-------------------
 //  DESCRIPTOR SET
 //-------------------
-VulkanDescriptorSet::VulkanDescriptorSet(const VulkanGraphicsPipeline* pipeline, VkDescriptorPool pool, uint32_t set)
+VulkanDescriptorSet::VulkanDescriptorSet(const VulkanPipeline* pipeline, VkDescriptorPool pool, uint32_t set)
     : m_Device(VulkanContext::GetDevice()->GetVulkanDevice())
     , m_DescriptorPool(pool)
     , m_SetIndex(set)
