@@ -90,10 +90,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\vendor\imgui\backends\imgui_impl_glfw.cpp" />
-    <ClCompile Include="..\vendor\imgui\backends\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\vendor\imgui\imgui.cpp" />
     <ClCompile Include="..\vendor\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\vendor\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\vendor\imgui\imgui_impl_vulkan_with_textures.cpp" />
     <ClCompile Include="..\vendor\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\vendor\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Core\Application.cpp" />
@@ -126,6 +126,7 @@
     <ClInclude Include="..\vendor\imgui\backends\imgui_impl_vulkan.h" />
     <ClInclude Include="..\vendor\imgui\imconfig.h" />
     <ClInclude Include="..\vendor\imgui\imgui.h" />
+    <ClInclude Include="..\vendor\imgui\imgui_impl_vulkan_with_textures.h" />
     <ClInclude Include="..\vendor\imgui\imgui_internal.h" />
     <ClInclude Include="..\vendor\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\vendor\imgui\imstb_textedit.h" />

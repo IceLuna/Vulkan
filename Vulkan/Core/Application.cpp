@@ -39,22 +39,21 @@ Application::~Application()
 
 void Application::Run()
 {
-    std::chrono::time_point<std::chrono::high_resolution_clock> before, after;
+    float lastFrameTime = (float)glfwGetTime();
 
-    while (!m_Window.ShouldClose()) {
-        before = std::chrono::high_resolution_clock::now();
+    while (!m_Window.ShouldClose())
+    {
+        const float currentFrameTime = (float)glfwGetTime();
+        float ts = currentFrameTime - lastFrameTime;
+        lastFrameTime = currentFrameTime;
+
         glfwPollEvents();
         if (!m_Minimized)
         {
-            Renderer::DrawFrame();
-
-            //Renderer::BeginImGui();
-            //ImGui::ShowDemoWindow();
-            //Renderer::EndImGui();
+            Renderer::DrawFrame(ts);
         }
-        after = std::chrono::high_resolution_clock::now();
 
-        auto s = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count() / 1000.f / 1000.f;
-        std::cout << "FPS: " << 1.f / s << "\r";
+        std::cout << "\33[2K\r" << "FPS: " << 1.f / ts;
     }
+    std::cout << '\r';
 }

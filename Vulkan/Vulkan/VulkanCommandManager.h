@@ -149,6 +149,8 @@ public:
 
 	void CommitDescriptors(VulkanGraphicsPipeline* pipeline);
 
+	VkCommandBuffer GetVulkanCommandBuffer() const { return m_CommandBuffer; }
+
 private:
 	std::unordered_set<VulkanStagingBuffer*> m_UsedStagingBuffers;
 	VkDevice m_Device = VK_NULL_HANDLE;

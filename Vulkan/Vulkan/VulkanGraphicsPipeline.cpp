@@ -203,8 +203,8 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.format = renderTarget->GetVulkanFormat();
-		desc.initialLayout = bClearEnabled ? VK_IMAGE_LAYOUT_UNDEFINED : ToVulkanLayout(state.ColorAttachments[i].InitialLayout);
-		desc.finalLayout = ToVulkanLayout(state.ColorAttachments[i].FinalLayout);
+		desc.initialLayout = bClearEnabled ? VK_IMAGE_LAYOUT_UNDEFINED : ImageLayoutToVulkan(state.ColorAttachments[i].InitialLayout);
+		desc.finalLayout = ImageLayoutToVulkan(state.ColorAttachments[i].FinalLayout);
 
 		colorRefs[i] = { attachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 		attachmentsImageViews.push_back(renderTarget->GetVulkanImageView());
@@ -230,8 +230,8 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.format = renderTarget->GetVulkanFormat();
-		desc.initialLayout = ToVulkanLayout(state.ResolveAttachments[i].InitialLayout);
-		desc.finalLayout = ToVulkanLayout(state.ResolveAttachments[i].FinalLayout);
+		desc.initialLayout = ImageLayoutToVulkan(state.ResolveAttachments[i].InitialLayout);
+		desc.finalLayout = ImageLayoutToVulkan(state.ResolveAttachments[i].FinalLayout);
 
 		resolveRefs[i] = { attachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 		attachmentsImageViews.push_back(renderTarget->GetVulkanImageView());
@@ -252,8 +252,8 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 		desc.stencilLoadOp = bClearEnabled ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.format = depthStencilImage->GetVulkanFormat();
-		desc.initialLayout = bClearEnabled ? VK_IMAGE_LAYOUT_UNDEFINED : ToVulkanLayout(state.DepthStencilAttachment.InitialLayout);
-		desc.finalLayout = ToVulkanLayout(state.DepthStencilAttachment.FinalLayout);
+		desc.initialLayout = bClearEnabled ? VK_IMAGE_LAYOUT_UNDEFINED : ImageLayoutToVulkan(state.DepthStencilAttachment.InitialLayout);
+		desc.finalLayout = ImageLayoutToVulkan(state.DepthStencilAttachment.FinalLayout);
 
 		const bool bDepthTestEnabled = (state.DepthStencilAttachment.DepthCompareOp != CompareOperation::Never);
 		depthStencilCI.depthTestEnable = bDepthTestEnabled;

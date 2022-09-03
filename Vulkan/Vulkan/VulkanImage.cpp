@@ -16,11 +16,9 @@ VulkanImage::VulkanImage(const ImageSpecifications& specs) : m_Specs(specs)
 
 	auto commandManager = Renderer::GetGraphicsCommandManager();
 	auto cmd = commandManager->AllocateCommandBuffer();
-	Ref<VulkanFence> fence = MakeRef<VulkanFence>();
 	cmd.TransitionLayout(this, ImageLayoutType::Unknown, m_Specs.Layout);
 	cmd.End();
-	commandManager->Submit(&cmd, 1, fence, nullptr, 0, nullptr, 0);
-	fence->Wait(); // TODO: Measure how much it takes to change layout
+	commandManager->Submit(&cmd, 1, nullptr, 0, nullptr, 0);
 }
 
 VulkanImage::VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns)
@@ -42,8 +40,8 @@ VulkanImage::~VulkanImage()
 
 VkImageAspectFlags VulkanImage::GetTransitionAspectMask(ImageLayout oldLayout, ImageLayout newLayout) const
 {
-	VkImageLayout vkOldLayout = ToVulkanLayout(oldLayout);
-	VkImageLayout vkNewLayout = ToVulkanLayout(newLayout);
+	VkImageLayout vkOldLayout = ImageLayoutToVulkan(oldLayout);
+	VkImageLayout vkNewLayout = ImageLayoutToVulkan(newLayout);
 	if (vkOldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL && (vkNewLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL || vkNewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL))
 		return VK_IMAGE_ASPECT_DEPTH_BIT;
 
@@ -114,6 +112,25 @@ VkImageView VulkanImage::GetVulkanImageView(const ImageView& viewInfo) const
 	VK_CHECK(vkCreateImageView(m_Device, &viewCI, nullptr, &imageView));
 
 	return imageView;
+}
+
+void VulkanImage::Resize(const glm::uvec3& size)
+{
+	assert(m_bOwns);
+	m_Specs.Size = size;
+
+	ReleaseImageView();
+	ReleaseImage();
+
+	CreateImage();
+	CreateImageView();
+
+	// Transition layout
+	auto commandManager = Renderer::GetGraphicsCommandManager();
+	auto cmd = commandManager->AllocateCommandBuffer();
+	cmd.TransitionLayout(this, ImageLayoutType::Unknown, m_Specs.Layout);
+	cmd.End();
+	commandManager->Submit(&cmd, 1, nullptr, 0, nullptr, 0);
 }
 
 void* VulkanImage::Map()

@@ -17,9 +17,13 @@
 
 #include "../Core/Mesh.h"
 
-#include <array>
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_vulkan_with_textures.h"
+#include "imgui/backends/imgui_impl_glfw.h"
 
 #include "glm/gtc/matrix_transform.hpp"
+
+#include <array>
 
 static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
 static uint32_t s_CurrentFrame = 0;
@@ -46,9 +50,111 @@ struct Data
 	VulkanTexture2D* Texture = nullptr;
 	VulkanBuffer* VertexBuffer = nullptr;
 	VulkanBuffer* IndexBuffer = nullptr;
+	float RotationSpeed = 0.5f;
+};
+
+struct ImGuiData
+{
+	VkDescriptorPool PersistantPool; // Used to init resources during ImGui initialization.
+	std::array<VkDescriptorPool, MAX_FRAMES_IN_FLIGHT> Pools; // Per frame pools to init and reset our resources
 };
 
 static Data* s_Data = nullptr;
+static ImGuiData* s_ImGuiData = nullptr;
+
+static void InitImGui()
+{
+	s_ImGuiData = new ImGuiData();
+	const VulkanDevice* device = VulkanContext::GetDevice();
+	VkDevice vkDevice = device->GetVulkanDevice();
+
+	constexpr VkDescriptorPoolSize poolSizes[] =
+	{
+		{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+	};
+
+	constexpr VkDescriptorPoolSize persistantPoolSizes[] =
+	{
+		{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+	};
+
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	poolInfo.maxSets = 1000;
+	poolInfo.poolSizeCount = (uint32_t)std::size(poolSizes);
+	poolInfo.pPoolSizes = poolSizes;
+
+	for (auto& pool : s_ImGuiData->Pools)
+		VK_CHECK(vkCreateDescriptorPool(vkDevice, &poolInfo, nullptr, &pool));
+
+	poolInfo.poolSizeCount = (uint32_t)std::size(persistantPoolSizes);
+	poolInfo.pPoolSizes = persistantPoolSizes;
+	VK_CHECK(vkCreateDescriptorPool(vkDevice, &poolInfo, nullptr, &s_ImGuiData->PersistantPool));
+
+	//this initializes the core structures of imgui
+	ImGui::CreateContext();
+
+	//this initializes imgui for SDL
+	ImGui_ImplGlfw_InitForVulkan(Application::GetApp().GetWindow().GetNativeWindow(), true);
+
+	//this initializes imgui for Vulkan
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.Instance = VulkanContext::GetInstance();
+	init_info.PhysicalDevice = device->GetPhysicalDevice()->GetVulkanPhysicalDevice();
+	init_info.Device = vkDevice;
+	init_info.Queue = device->GetGraphicsQueue();
+	init_info.DescriptorPool = s_ImGuiData->PersistantPool;
+	init_info.MinImageCount = 2;
+	init_info.ImageCount = MAX_FRAMES_IN_FLIGHT;
+	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+	ImGui_ImplVulkan_Init(&init_info, (VkRenderPass)s_Data->Pipeline->GetRenderPassHandle());
+
+	// execute a gpu command to upload imgui font textures
+	Ref<VulkanFence> fence = MakeRef<VulkanFence>();
+	auto cmd = s_Data->GraphicsCommandManager->AllocateCommandBuffer();
+	ImGui_ImplVulkan_CreateFontsTexture(cmd.GetVulkanCommandBuffer());
+	cmd.End();
+	s_Data->GraphicsCommandManager->Submit(&cmd, 1, fence, nullptr, 0, nullptr, 0);
+	fence->Wait();
+
+	//clear font textures from cpu data
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+
+static void ShutdownImGui()
+{
+	const VulkanDevice* device = VulkanContext::GetDevice();
+	VkDevice vkDevice = device->GetVulkanDevice();
+
+	for (auto& pool : s_ImGuiData->Pools)
+		vkDestroyDescriptorPool(vkDevice, pool, nullptr);
+	vkDestroyDescriptorPool(vkDevice, s_ImGuiData->PersistantPool, nullptr);
+
+	ImGui_ImplVulkan_Shutdown();
+	delete s_ImGuiData;
+}
 
 void Renderer::Init()
 {
@@ -126,12 +232,15 @@ void Renderer::Init()
 	cmd.End();
 	s_Data->GraphicsCommandManager->Submit(&cmd, 1, writeBuffersFence, nullptr, 0, nullptr, 0);
 	writeBuffersFence->Wait();
+
+	InitImGui();
 }
 
 void Renderer::Shutdown()
 {
 	VulkanContext::GetDevice()->WaitIdle();
-
+	
+	ShutdownImGui();
 	VulkanStagingManager::ReleaseBuffers();
 
 	delete s_Data->Pipeline;
@@ -160,13 +269,8 @@ void Renderer::Shutdown()
 	VulkanAllocator::Shutdown();
 }
 
-void Renderer::DrawFrame()
+void Renderer::DrawFrame(float ts)
 {
-	static auto startTime = std::chrono::high_resolution_clock::now();
-
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
 	auto& semaphore = s_Data->Semaphores[s_CurrentFrame];
 	auto& fence = s_Data->Fences[s_CurrentFrame];
 	auto& cmd = s_Data->CommandBuffers[s_CurrentFrame];
@@ -176,6 +280,9 @@ void Renderer::DrawFrame()
 
 	uint32_t imageIndex = 0;
 	auto imageAcquireSemaphore = s_Data->Swapchain->AcquireImage(&imageIndex);
+
+	Renderer::BeginImGui();
+	Renderer::DrawImGui();
 
 	struct PushConstant
 	{
@@ -187,7 +294,9 @@ void Renderer::DrawFrame()
 	glm::mat4 proj = glm::perspective(glm::radians(45.f), float(s_Data->Size.x) / s_Data->Size.y, 0.1f, 10.f);
 	proj[1][1] *= -1;
 
-	pushData.model = glm::rotate(glm::mat4(1.0f), 0.5f * time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	static float angle = 0.f;
+	angle += s_Data->RotationSpeed * ts * glm::radians(90.0f);
+	pushData.model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
 	pushData.view_proj = proj * view;
 
 	s_Data->Pipeline->SetImageSampler(s_Data->Texture, 0, 0);
@@ -195,6 +304,7 @@ void Renderer::DrawFrame()
 	cmd.BeginGraphics(*s_Data->Pipeline, *s_Data->Framebuffers[imageIndex]);
 	cmd.SetGraphicsRootConstants(&pushData, nullptr);
 	cmd.DrawIndexed(s_Data->VertexBuffer, s_Data->IndexBuffer, (uint32_t)s_Data->Mesh->GetIndices().size(), 0, 0);
+	EndImGui(&cmd);
 	cmd.EndGraphics();
 	cmd.End();
 
@@ -202,6 +312,21 @@ void Renderer::DrawFrame()
 	s_Data->Swapchain->Present(&semaphore);
 
 	s_CurrentFrame = (s_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void Renderer::DrawImGui()
+{
+	ImGui::Begin("Params");
+	ImGui::DragFloat("Rotation speed", &s_Data->RotationSpeed, 0.05f, 0.0f, 5.f);
+	
+	VkSampler sampler = s_Data->Texture->GetSampler()->GetVulkanSampler();
+	VkImageView imageView = s_Data->Texture->GetImage()->GetVulkanImageView();
+	VkImageLayout layout = ImageLayoutToVulkan(s_Data->Texture->GetImage()->GetLayout());
+
+	const auto textureID = ImGui_ImplVulkan_AddTexture(sampler, imageView, layout);
+
+	ImGui::Image(textureID, { 1000, 1000 });
+	ImGui::End();
 }
 
 void Renderer::OnWindowResized()
@@ -214,16 +339,24 @@ void Renderer::OnWindowResized()
 	const void* renderPassHandle = s_Data->Pipeline->GetRenderPassHandle();
 	glm::uvec2 size = s_Data->Swapchain->GetSize();
 	s_Data->Size = size;
+	s_Data->DepthImage->Resize({ size, 1 });
 	for (auto& image : swapchainImages)
-		s_Data->Framebuffers.push_back(new VulkanFramebuffer({ image }, renderPassHandle, size));
+		s_Data->Framebuffers.push_back(new VulkanFramebuffer({ image, s_Data->DepthImage }, renderPassHandle, size));
 }
 
 void Renderer::BeginImGui()
 {
+	//imgui new frame
+	ImGui_SetPerFrameDescriptorPool(s_ImGuiData->Pools[s_CurrentFrame]);
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
 }
 
-void Renderer::EndImGui()
+void Renderer::EndImGui(VulkanCommandBuffer* cmd)
 {
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd->GetVulkanCommandBuffer());
 }
 
 VulkanContext& Renderer::GetContext()

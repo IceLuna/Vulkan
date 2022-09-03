@@ -23,7 +23,7 @@ inline VkPrimitiveTopology TopologyToVulkan(Topology topology)
 	return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
 }
 
-inline VkImageLayout ToVulkanLayout(ImageLayout imageLayout)
+inline VkImageLayout ImageLayoutToVulkan(ImageLayout imageLayout)
 {
 	switch (imageLayout.LayoutType)
 	{

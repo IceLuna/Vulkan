@@ -344,8 +344,9 @@ void VulkanCommandBuffer::TransitionLayout(VulkanImage* image, ImageLayout oldLa
 
 void VulkanCommandBuffer::TransitionLayout(VulkanImage* image, const ImageView& imageView, ImageLayout oldLayout, ImageLayout newLayout)
 {
-	const VkImageLayout vkOldLayout = ToVulkanLayout(oldLayout);
-	const VkImageLayout vkNewLayout = ToVulkanLayout(newLayout);
+	image->SetImageLayout(newLayout);
+	const VkImageLayout vkOldLayout = ImageLayoutToVulkan(oldLayout);
+	const VkImageLayout vkNewLayout = ImageLayoutToVulkan(newLayout);
 
 	VkImageMemoryBarrier barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;

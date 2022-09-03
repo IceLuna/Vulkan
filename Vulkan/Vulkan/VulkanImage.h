@@ -46,6 +46,8 @@ public:
     uint32_t GetLayersCount() const { return m_Specs.bIsCube ? 6 : 1; }
     bool IsCube() const { return m_Specs.bIsCube; }
 
+    void Resize(const glm::uvec3& size);
+
     void* Map();
     void Unmap();
 
@@ -62,6 +64,8 @@ private:
     void CreateImageView();
     void ReleaseImageView();
 
+    void SetImageLayout(ImageLayout layout) { m_Specs.Layout = layout; }
+
 private:
     mutable std::unordered_map<ImageView, VkImageView> m_Views; // Mutable by `GetVulkanImageView(const ImageView&)`
 
@@ -73,4 +77,6 @@ private:
     VkFormat m_VulkanFormat = VK_FORMAT_UNDEFINED;
     VkImageAspectFlags m_AspectMask;
     bool m_bOwns = true;
+
+    friend class VulkanCommandBuffer;
 };
