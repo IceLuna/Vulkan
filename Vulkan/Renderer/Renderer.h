@@ -20,5 +20,5 @@ public:
 	static VulkanContext& GetContext();
 	static VulkanCommandManager* GetGraphicsCommandManager();
 
-	static const char* GetPipelineCachePath() { return "Cache/Renderer"; }
+	static const char* GetRendererCachePath() { return "Cache/Renderer"; }
 };

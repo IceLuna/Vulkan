@@ -44,8 +44,9 @@ public:
 
 	ShaderType GetType() const { return m_Type; }
 
-private:
 	void Reload();
+
+private:
 	void LoadBinary();
 	void CreateShaderModule();
 	void Reflect(const std::vector<uint32_t>& binary);

@@ -2,6 +2,7 @@
 #include "VulkanContext.h"
 
 #include "../Core/FileSystem.h"
+#include "../Renderer/Renderer.h"
 
 #include "shaderc/shaderc.hpp"
 #include "spirv-tools/libspirv.h"
@@ -206,6 +207,7 @@ void VulkanShader::LoadBinary()
 		return;
 	}
 
+	// Adding defines and reading shader code from the file
 	std::stringstream buffer;
 	buffer << s_ShaderVersion << '\n';
 	for (auto& define : m_Defines)
@@ -213,23 +215,72 @@ void VulkanShader::LoadBinary()
 	buffer << fin.rdbuf();
 	fin.close();
 	std::string source = buffer.str();
+	const size_t sourceHash = std::hash<std::string>()(source);
 
-	shaderc::Compiler compiler;
-	shaderc::CompileOptions options;
-	options.SetTargetEnvironment(shaderc_target_env_vulkan, Utils::GetShaderCVersion());
-	options.SetWarningsAsErrors();
-	options.SetGenerateDebugInfo();
-
-	shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source, Utils::ShaderTypeToShaderC(m_Type), m_Path.u8string().c_str(), options);
-
-	if (module.GetCompilationStatus() != shaderc_compilation_status_success)
+	// Trying to find a cache for the shader
+	Path cachePath = Path(Renderer::GetRendererCachePath()) / "Shaders/Vulkan";
+	Path cacheFilePath = cachePath / (m_Path.filename().u8string() + ".bin");
+	bool bLoadedFromCache = false;
+	if (std::filesystem::exists(cacheFilePath))
 	{
-		std::cerr << "[Renderer::Vulkan] Failed to compile shader at: " << m_Path << '\n';
-		std::cerr << "Error: \n" << module.GetErrorMessage();
-		assert(false);
+		// If cache exists, read it
+		std::ifstream cacheFin(cacheFilePath, std::ios_base::binary);
+		std::stringstream cacheBuffer;
+		cacheBuffer << cacheFin.rdbuf();
+		cacheFin.close();
+		std::string cacheSource = cacheBuffer.str();
+
+		// Since first line of the cache-file is hash, find it and read it 
+		size_t newLinePos = cacheSource.find_first_of('\n');
+		std::string cacheHashStr = cacheSource.substr(0, newLinePos);
+		size_t cacheHash = 0;
+		std::stringstream converter(cacheHashStr);
+		converter >> cacheHash;
+
+		// Check if current shader hash matches the hash of the cache
+		if (sourceHash == cacheHash)
+		{
+			// Hashes are the same. Now we can read rest of the file (shader binary)
+			bLoadedFromCache = true;
+			std::string cacheBinaryStr = cacheSource.substr(newLinePos + 1);
+			size_t strBinarySize = cacheBinaryStr.size();
+			// Binary has uint32 type and string is char. So we divide caches size by 4
+			m_Binary.reserve(strBinarySize / 4);
+			for (size_t i = 0; i < strBinarySize; i += 4)
+				m_Binary.push_back(*(uint32_t*)&cacheBinaryStr[i]); // Reading 4 chars as uint32_t
+		}
 	}
 
-	m_Binary = std::vector<uint32_t>(module.begin(), module.end());
+	if (!bLoadedFromCache)
+	{
+		// 1) Compile
+		shaderc::Compiler compiler;
+		shaderc::CompileOptions options;
+		options.SetTargetEnvironment(shaderc_target_env_vulkan, Utils::GetShaderCVersion());
+		options.SetWarningsAsErrors();
+		options.SetGenerateDebugInfo();
+
+		shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source, Utils::ShaderTypeToShaderC(m_Type), m_Path.u8string().c_str(), options);
+		if (module.GetCompilationStatus() != shaderc_compilation_status_success)
+		{
+			std::cerr << "[Renderer::Vulkan] Failed to compile shader at: " << m_Path << '\n';
+			std::cerr << "Error: \n" << module.GetErrorMessage();
+			assert(false);
+		}
+
+		m_Binary = std::vector<uint32_t>(module.begin(), module.end());
+
+		// 2) Write to cache
+		if (!std::filesystem::exists(cachePath))
+			std::filesystem::create_directories(cachePath);
+
+		std::string sourceHashStr = std::to_string(sourceHash) + '\n';
+		std::ofstream out(cacheFilePath, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+		out.write(sourceHashStr.c_str(), sourceHashStr.size());
+		out.write((const char*)m_Binary.data(), m_Binary.size() * sizeof(uint32_t));
+		out.close();
+	}
+
 	Reflect(m_Binary);
 }
 

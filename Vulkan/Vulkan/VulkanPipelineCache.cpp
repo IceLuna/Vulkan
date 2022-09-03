@@ -13,7 +13,7 @@ void VulkanPipelineCache::Init()
 	// Pipeline cache
 	const auto& props = VulkanContext::GetDevice()->GetPhysicalDevice()->GetProperties();
 	std::stringstream cachePath;
-	cachePath << Renderer::GetPipelineCachePath()
+	cachePath << Renderer::GetRendererCachePath()
 		<< "/" << std::to_string(props.deviceID)
 		<< "_" << std::to_string(props.vendorID)
 		<< "_" << std::to_string(props.apiVersion)
@@ -50,7 +50,7 @@ void VulkanPipelineCache::Init()
 
 void VulkanPipelineCache::Shutdown()
 {
-	std::filesystem::path path = Renderer::GetPipelineCachePath();
+	std::filesystem::path path = Renderer::GetRendererCachePath();
 	if (!std::filesystem::exists(path))
 		std::filesystem::create_directories(path);
 
