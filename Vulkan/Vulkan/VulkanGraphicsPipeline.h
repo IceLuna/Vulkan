@@ -54,7 +54,7 @@ public:
 	DepthStencilAttachment DepthStencilAttachment;
 	Topology Topology = Topology::Triangles;
 	CullMode CullMode = CullMode::None;
-	float LineWidth = 1.5f;
+	float LineWidth = 1.0f;
 	bool bEnableConservativeRasterization = false;
 
 	SamplesCount GetSamplesCount() const

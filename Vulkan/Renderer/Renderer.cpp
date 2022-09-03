@@ -231,9 +231,9 @@ void Renderer::Init()
 	cmd.Write(s_Data->IndexBuffer, indices.data(), indices.size() * sizeof(uint32_t), 0, BufferLayoutType::Unknown, BufferReadAccess::Index);
 	cmd.End();
 	s_Data->GraphicsCommandManager->Submit(&cmd, 1, writeBuffersFence, nullptr, 0, nullptr, 0);
-	writeBuffersFence->Wait();
 
 	InitImGui();
+	writeBuffersFence->Wait();
 }
 
 void Renderer::Shutdown()

@@ -14,7 +14,6 @@ VulkanStagingBuffer* VulkanStagingManager::AcquireBuffer(size_t size, bool bIsCP
 
 	for (auto& staging : s_StagingBuffers)
 	{
-		assert(staging->m_Fence);
 		if (staging->IsCPURead() == bIsCPURead && size <= staging->GetSize())
 		{
 			if (staging->m_State == StagingBufferState::Free)
@@ -24,6 +23,7 @@ VulkanStagingBuffer* VulkanStagingManager::AcquireBuffer(size_t size, bool bIsCP
 			}
 			else if (staging->m_State == StagingBufferState::InFlight)
 			{
+				assert(staging->m_Fence);
 				if (staging->m_Fence->IsSignaled())
 				{
 					stagingBuffer = staging;
@@ -38,6 +38,7 @@ VulkanStagingBuffer* VulkanStagingManager::AcquireBuffer(size_t size, bool bIsCP
 		stagingBuffer = new VulkanStagingBuffer(size, bIsCPURead);
 		s_StagingBuffers.push_back(stagingBuffer);
 	}
+	stagingBuffer->SetFence(nullptr);
 	stagingBuffer->m_State = StagingBufferState::Pending;
 
 	return stagingBuffer;

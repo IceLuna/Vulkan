@@ -96,6 +96,7 @@ void VulkanCommandManager::Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdB
 				staging->SetState(StagingBufferState::InFlight);
 			}
 		}
+		cmdBuffer->m_UsedStagingBuffers.clear();
 	}
 
 	std::vector<VkSemaphore> vkSignalSemaphores(signalSemaphoresCount);
