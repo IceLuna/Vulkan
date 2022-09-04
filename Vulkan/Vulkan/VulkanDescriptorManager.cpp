@@ -100,7 +100,7 @@ void VulkanDescriptorManager::WriteDescriptors(const VulkanPipeline* pipeline, c
                 const size_t startIdx = buffers.size();
                 for (auto& buffer : bindingData.BufferBindings)
                 {
-                    VkBuffer vkBuffer = buffer.Buffer ? buffer.Buffer->GetVulkanBuffer() : VK_NULL_HANDLE;
+                    VkBuffer vkBuffer = buffer.Buffer;
                     if (vkBuffer == VK_NULL_HANDLE)
                         std::cerr << "Error! Invalid buffer binding for binding " << std::to_string(binding.binding) << ", set " << std::to_string(set) << '\n';
 
@@ -125,14 +125,14 @@ void VulkanDescriptorManager::WriteDescriptors(const VulkanPipeline* pipeline, c
                 const size_t startIdx = images.size();
                 if (IsSamplerType(binding.descriptorType))
                 {
-                    images.push_back({ bindingData.ImageBindings[0].Sampler->GetVulkanSampler(), VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED });
+                    images.push_back({ bindingData.ImageBindings[0].Sampler, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED });
                 }
                 else
                 {
                     for (auto& image : bindingData.ImageBindings)
                     {
-                        VkSampler sampler = image.Sampler ? image.Sampler->GetVulkanSampler() : VK_NULL_HANDLE;
-                        VkImageView imageView = image.Image->GetVulkanImageView(image.View);
+                        VkSampler sampler = image.Sampler;
+                        VkImageView imageView = image.View;
                         VkImageLayout imageLayout;
                         if ((binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) || (binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER))
                             imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

@@ -12,17 +12,23 @@ class DescriptorSetData
 public:
 	struct ImageBinding
 	{
-		const VulkanImage* Image = nullptr;
-		ImageView View{};
-		const VulkanSampler* Sampler = nullptr;
+		VkImage Image = VK_NULL_HANDLE;
+		VkImageView View{};
+		VkSampler Sampler = VK_NULL_HANDLE;
 
 		ImageBinding() = default;
-		ImageBinding(const VulkanImage* image) : Image(image), View(image->GetImageView()) {}
-		ImageBinding(const VulkanImage* image, const ImageView& view) : Image(image), View(view) {}
-		ImageBinding(const ImageView& view) : View(view) {}
-		ImageBinding(const VulkanImage* image, const ImageView& view, const VulkanSampler* sampler) : Image(image), View(view), Sampler(sampler) {}
-		ImageBinding(const VulkanImage* image, const VulkanSampler* sampler) : Image(image), Sampler(sampler) {}
-		ImageBinding(const VulkanSampler* sampler) : Sampler(sampler) {}
+		ImageBinding(const VulkanImage* image) : Image(image->GetImage()), View(image->GetVulkanImageView()) {}
+		ImageBinding(const VulkanImage* image, const ImageView& view) : Image(image->GetImage()), View(image->GetVulkanImageView(view)) {}
+		ImageBinding(VkImageView view) : View(view) {}
+		ImageBinding(const VulkanImage* image, const ImageView& view, const VulkanSampler* sampler)
+			: Image(image->GetImage())
+			, View(image->GetVulkanImageView(view))
+			, Sampler(sampler->GetVulkanSampler()) {}
+		ImageBinding(const VulkanImage* image, const VulkanSampler* sampler)
+			: Image(image->GetImage())
+			, View(image->GetVulkanImageView())
+			, Sampler(sampler->GetVulkanSampler()) {}
+		ImageBinding(const VulkanSampler* sampler) : Sampler(sampler->GetVulkanSampler()) {}
 
 		bool operator!=(const ImageBinding& other) const
 		{
@@ -45,13 +51,13 @@ public:
 
 	struct BufferBinding
 	{
-		const VulkanBuffer* Buffer = nullptr;
+		VkBuffer Buffer = VK_NULL_HANDLE;
 		size_t Offset = 0;
 		size_t Range = size_t(-1);
 
 		BufferBinding() = default;
-		BufferBinding(const VulkanBuffer* buffer) : Buffer(buffer) {}
-		BufferBinding(const VulkanBuffer* buffer, size_t offset, size_t range) : Buffer(buffer), Offset(offset), Range(range) {}
+		BufferBinding(const VulkanBuffer* buffer) : Buffer(buffer->GetVulkanBuffer()) {}
+		BufferBinding(const VulkanBuffer* buffer, size_t offset, size_t range) : Buffer(buffer->GetVulkanBuffer()), Offset(offset), Range(range) {}
 
 		bool operator != (const BufferBinding& other) const
 		{

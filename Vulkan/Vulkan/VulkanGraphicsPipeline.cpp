@@ -453,3 +453,49 @@ VulkanGraphicsPipeline::~VulkanGraphicsPipeline()
 	m_Framebuffer = VK_NULL_HANDLE;
 	m_PipelineLayout = VK_NULL_HANDLE;
 }
+
+void VulkanGraphicsPipeline::Resize(uint32_t width, uint32_t height)
+{
+	m_Width = width;
+	m_Height = height;
+
+	VkDevice device = VulkanContext::GetDevice()->GetVulkanDevice();
+	
+	if (m_Framebuffer)
+		vkDestroyFramebuffer(device, m_Framebuffer, nullptr);
+
+	std::vector<VkImageView> attachmentsImageViews;
+	attachmentsImageViews.reserve(m_State.ColorAttachments.size());
+	for (size_t i = 0; i < m_State.ColorAttachments.size(); ++i)
+	{
+		const VulkanImage* renderTarget = m_State.ColorAttachments[i].Image;
+		if (!renderTarget)
+			continue;
+
+		attachmentsImageViews.push_back(renderTarget->GetVulkanImageView());
+	}
+
+	for (size_t i = 0; i < m_State.ResolveAttachments.size(); ++i)
+	{
+		const VulkanImage* renderTarget = m_State.ResolveAttachments[i].Image;
+		if (!renderTarget)
+			continue;
+
+		attachmentsImageViews.push_back(renderTarget->GetVulkanImageView());
+	}
+
+	VkPipelineDepthStencilStateCreateInfo depthStencilCI = s_DefaultDepthStencilCI;
+	const VulkanImage* depthStencilImage = m_State.DepthStencilAttachment.Image;
+	if (depthStencilImage)
+		attachmentsImageViews.push_back(depthStencilImage->GetVulkanImageView());
+
+	VkFramebufferCreateInfo framebufferCI{};
+	framebufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	framebufferCI.attachmentCount = (uint32_t)attachmentsImageViews.size();
+	framebufferCI.renderPass = m_RenderPass;
+	framebufferCI.width = m_Width;
+	framebufferCI.height = m_Height;
+	framebufferCI.layers = 1;
+	framebufferCI.pAttachments = attachmentsImageViews.data();
+	VK_CHECK(vkCreateFramebuffer(device, &framebufferCI, nullptr, &m_Framebuffer));
+}

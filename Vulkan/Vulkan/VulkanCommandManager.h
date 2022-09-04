@@ -49,6 +49,8 @@ public:
 	VulkanCommandManager& operator=(const VulkanCommandManager&) = delete;
 	VulkanCommandManager& operator=(VulkanCommandManager&& other) noexcept = delete;
 
+	VkQueue GetVulkanQueue() const { return m_Queue; }
+
 	VulkanCommandBuffer AllocateCommandBuffer(bool bBegin = true);
 
 	void Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,

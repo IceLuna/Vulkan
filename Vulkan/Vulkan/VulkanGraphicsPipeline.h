@@ -101,6 +101,9 @@ public:
 	uint32_t GetWidth() const { return m_Width; }
 	uint32_t GetHeight() const { return m_Height; }
 
+	// Resizes framebuffer
+	void Resize(uint32_t width, uint32_t height);
+
 	virtual VkPipelineLayout GetVulkanPipelineLayout() const override { return m_PipelineLayout; }
 
 private:

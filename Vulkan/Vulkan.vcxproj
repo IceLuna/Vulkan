@@ -169,8 +169,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\basic.comp" />
-    <None Include="Shaders\basic.frag" />
-    <None Include="Shaders\basic.vert" />
+    <None Include="Shaders\mesh.frag" />
+    <None Include="Shaders\mesh.vert" />
+    <None Include="Shaders\present.frag" />
+    <None Include="Shaders\present.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

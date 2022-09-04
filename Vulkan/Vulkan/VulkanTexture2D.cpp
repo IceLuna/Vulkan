@@ -85,9 +85,6 @@ VulkanTexture2D::VulkanTexture2D(ImageFormat format, glm::uvec2 size, const void
 	size_t dataSize = CalculateImageMemorySize(m_Format, m_Width, m_Height);
 	const uint32_t mipsCount = m_Specs.bGenerateMips ? CalculateMipCount(m_Width, m_Height) : 1;
 
-	if (data)
-		m_ImageData = DataBuffer::Copy(data, dataSize);
-
 	ImageSpecifications imageSpecs;
 	imageSpecs.Format = m_Format;
 	imageSpecs.Size = glm::uvec3{ m_Width, m_Height, 1 };
@@ -97,15 +94,19 @@ VulkanTexture2D::VulkanTexture2D(ImageFormat format, glm::uvec2 size, const void
 	imageSpecs.SamplesCount = m_Specs.SamplesCount;
 	m_Image = new VulkanImage(imageSpecs);
 
-	Ref<VulkanFence> writeFence = MakeRef<VulkanFence>();
-	auto cmdManager = Renderer::GetGraphicsCommandManager();
-	auto cmd = cmdManager->AllocateCommandBuffer();
-	cmd.Write(m_Image, m_ImageData.Data, m_ImageData.Size, ImageLayoutType::CopyDest, ImageReadAccess::PixelShaderRead);
-	cmd.End();
-	cmdManager->Submit(&cmd, 1, writeFence, nullptr, 0, nullptr, 0);
+	if (data)
+	{
+		m_ImageData = DataBuffer::Copy(data, dataSize);
+		Ref<VulkanFence> writeFence = MakeRef<VulkanFence>();
+		auto cmdManager = Renderer::GetGraphicsCommandManager();
+		auto cmd = cmdManager->AllocateCommandBuffer();
+		cmd.Write(m_Image, m_ImageData.Data, m_ImageData.Size, ImageLayoutType::CopyDest, ImageReadAccess::PixelShaderRead);
+		cmd.End();
+		cmdManager->Submit(&cmd, 1, writeFence, nullptr, 0, nullptr, 0);
 
-	m_Sampler = new VulkanSampler(m_Specs.FilterMode, m_Specs.AddressMode, CompareOperation::Never, 0.f, mipsCount > 1 ? float(mipsCount) : 0.f, m_Specs.MaxAnisotropy);
-	writeFence->Wait();
+		m_Sampler = new VulkanSampler(m_Specs.FilterMode, m_Specs.AddressMode, CompareOperation::Never, 0.f, mipsCount > 1 ? float(mipsCount) : 0.f, m_Specs.MaxAnisotropy);
+		writeFence->Wait();
+	}
 }
 
 VulkanTexture2D::~VulkanTexture2D()

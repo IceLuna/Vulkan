@@ -30,18 +30,24 @@ static uint32_t s_CurrentFrame = 0;
 
 struct Data
 {
-	VulkanGraphicsPipeline* Pipeline = nullptr;
+	VulkanGraphicsPipeline* DrawingPipeline = nullptr;
+	VulkanGraphicsPipeline* PresentPipeline = nullptr;
 	VulkanCommandManager* GraphicsCommandManager = nullptr;
 	VulkanSwapchain* Swapchain = nullptr;
-	std::vector<VulkanFramebuffer*> Framebuffers;
+	std::vector<VulkanFramebuffer*> PresentFramebuffers;
 
 	std::vector<VulkanCommandBuffer> CommandBuffers;
 	std::vector<Ref<VulkanFence>> Fences;
 	std::array<VulkanSemaphore, MAX_FRAMES_IN_FLIGHT> Semaphores;
 
-	VulkanShader* VertexShader = nullptr;
-	VulkanShader* FragmentShader = nullptr;
+	VulkanShader* MeshVertexShader = nullptr;
+	VulkanShader* MeshFragmentShader = nullptr;
 
+	VulkanShader* PresentVertexShader = nullptr;
+	VulkanShader* PresentFragmentShader = nullptr;
+
+	VulkanImage* ColorImage = nullptr;
+	VulkanSampler* ColorSampler = nullptr;
 	VulkanImage* DepthImage = nullptr;
 
 	glm::uvec2 Size = {800, 600};
@@ -129,7 +135,7 @@ static void InitImGui()
 	init_info.ImageCount = MAX_FRAMES_IN_FLIGHT;
 	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-	ImGui_ImplVulkan_Init(&init_info, (VkRenderPass)s_Data->Pipeline->GetRenderPassHandle());
+	ImGui_ImplVulkan_Init(&init_info, (VkRenderPass)s_Data->PresentPipeline->GetRenderPassHandle());
 
 	// execute a gpu command to upload imgui font textures
 	Ref<VulkanFence> fence = MakeRef<VulkanFence>();
@@ -156,22 +162,10 @@ static void ShutdownImGui()
 	delete s_ImGuiData;
 }
 
-void Renderer::Init()
+static void SetupRenderingPipeline()
 {
-	VulkanAllocator::Init();
-	VulkanPipelineCache::Init();
-	VulkanDescriptorManager::Init();
-
-	s_Data = new Data;
-	s_Data->Swapchain = Application::GetApp().GetWindow().GetSwapchain();
-	s_Data->Size = s_Data->Swapchain->GetSize();
-
-	s_Data->GraphicsCommandManager = new VulkanCommandManager(CommandQueueFamily::Graphics, true);
-
-	s_Data->VertexShader = new VulkanShader("Shaders/basic.vert", ShaderType::Vertex);
-	s_Data->FragmentShader = new VulkanShader("Shaders/basic.frag", ShaderType::Fragment);
-
-	auto& swapchainImages = s_Data->Swapchain->GetImages();
+	s_Data->MeshVertexShader = new VulkanShader("Shaders/mesh.vert", ShaderType::Vertex);
+	s_Data->MeshFragmentShader = new VulkanShader("Shaders/mesh.frag", ShaderType::Fragment);
 
 	ImageSpecifications depthSpecs;
 	depthSpecs.Format = ImageFormat::D32_Float;
@@ -180,10 +174,17 @@ void Renderer::Init()
 	depthSpecs.Usage = ImageUsage::DepthStencilAttachment;
 	s_Data->DepthImage = new VulkanImage(depthSpecs);
 
+	ImageSpecifications colorSpecs;
+	colorSpecs.Format = ImageFormat::R8G8B8A8_UNorm;
+	colorSpecs.Layout = ImageLayoutType::RenderTarget;
+	colorSpecs.Size = { s_Data->Size.x, s_Data->Size.y, 1 };
+	colorSpecs.Usage = ImageUsage::ColorAttachment | ImageUsage::Sampled;
+	s_Data->ColorImage = new VulkanImage(colorSpecs);
+
 	ColorAttachment colorAttachment;
-	colorAttachment.Image = swapchainImages[0];
+	colorAttachment.Image = s_Data->ColorImage;
 	colorAttachment.InitialLayout = ImageLayoutType::Unknown;
-	colorAttachment.FinalLayout = ImageLayoutType::Present;
+	colorAttachment.FinalLayout = ImageReadAccess::PixelShaderRead;
 	colorAttachment.bClearEnabled = true;
 	colorAttachment.ClearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f };
 
@@ -197,16 +198,56 @@ void Renderer::Init()
 	depthAttachment.DepthCompareOp = CompareOperation::Less;
 
 	GraphicsPipelineState state;
-	state.VertexShader = s_Data->VertexShader;
-	state.FragmentShader = s_Data->FragmentShader;
+	state.VertexShader = s_Data->MeshVertexShader;
+	state.FragmentShader = s_Data->MeshFragmentShader;
 	state.ColorAttachments.push_back(colorAttachment);
 	state.DepthStencilAttachment = depthAttachment;
 	state.CullMode = CullMode::None;
 
-	s_Data->Pipeline = new VulkanGraphicsPipeline(state);
+	s_Data->DrawingPipeline = new VulkanGraphicsPipeline(state);
+	s_Data->ColorSampler = new VulkanSampler(FilterMode::Point, AddressMode::Wrap, CompareOperation::Never, 0.0f, 0.0f, 1.f);
+}
+
+static void SetupPresentPipeline()
+{
+	s_Data->PresentVertexShader = new VulkanShader("Shaders/present.vert", ShaderType::Vertex);
+	s_Data->PresentFragmentShader = new VulkanShader("Shaders/present.frag", ShaderType::Fragment);
+
+	auto& swapchainImages = s_Data->Swapchain->GetImages();
+
+	ColorAttachment colorAttachment;
+	colorAttachment.Image = swapchainImages[0];
+	colorAttachment.InitialLayout = ImageLayoutType::Unknown;
+	colorAttachment.FinalLayout = ImageLayoutType::Present;
+	colorAttachment.bClearEnabled = true;
+	colorAttachment.ClearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f };
+
+	GraphicsPipelineState state;
+	state.VertexShader = s_Data->PresentVertexShader;
+	state.FragmentShader = s_Data->PresentFragmentShader;
+	state.ColorAttachments.push_back(colorAttachment);
+	state.CullMode = CullMode::None;
+
+	s_Data->PresentPipeline = new VulkanGraphicsPipeline(state);
 
 	for (auto& image : swapchainImages)
-		s_Data->Framebuffers.push_back(new VulkanFramebuffer({ image, s_Data->DepthImage }, s_Data->Pipeline->GetRenderPassHandle(), s_Data->Size));
+		s_Data->PresentFramebuffers.push_back(new VulkanFramebuffer({ image }, s_Data->PresentPipeline->GetRenderPassHandle(), s_Data->Size));
+}
+
+void Renderer::Init()
+{
+	VulkanAllocator::Init();
+	VulkanPipelineCache::Init();
+	VulkanDescriptorManager::Init();
+
+	s_Data = new Data;
+	s_Data->Swapchain = Application::GetApp().GetWindow().GetSwapchain();
+	s_Data->Size = s_Data->Swapchain->GetSize();
+
+	s_Data->GraphicsCommandManager = new VulkanCommandManager(CommandQueueFamily::Graphics, true);
+
+	SetupRenderingPipeline();
+	SetupPresentPipeline();
 
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
@@ -220,8 +261,8 @@ void Renderer::Init()
 	auto& vertices = s_Data->Mesh->GetVertices();
 	auto& indices = s_Data->Mesh->GetIndices();
 
-	BufferSpecifications vertexSpecs { vertices.size() * sizeof(Vertex), MemoryType::Gpu, BufferUsage::VertexBuffer | BufferUsage::TransferDst};
-	BufferSpecifications indexSpecs  { indices.size() * sizeof(uint32_t),   MemoryType::Gpu, BufferUsage::IndexBuffer | BufferUsage::TransferDst};
+	BufferSpecifications vertexSpecs { vertices.size() * sizeof(Vertex),  MemoryType::Gpu, BufferUsage::VertexBuffer | BufferUsage::TransferDst};
+	BufferSpecifications indexSpecs  { indices.size() * sizeof(uint32_t), MemoryType::Gpu, BufferUsage::IndexBuffer  | BufferUsage::TransferDst};
 	s_Data->VertexBuffer = new VulkanBuffer(vertexSpecs);
 	s_Data->IndexBuffer  = new VulkanBuffer(indexSpecs);
 
@@ -243,18 +284,23 @@ void Renderer::Shutdown()
 	ShutdownImGui();
 	VulkanStagingManager::ReleaseBuffers();
 
-	delete s_Data->Pipeline;
+	delete s_Data->DrawingPipeline;
+	delete s_Data->PresentPipeline;
+	delete s_Data->ColorImage;
+	delete s_Data->ColorSampler;
 	delete s_Data->DepthImage;
-	delete s_Data->VertexShader;
-	delete s_Data->FragmentShader;
+	delete s_Data->MeshVertexShader;
+	delete s_Data->PresentVertexShader;
+	delete s_Data->MeshFragmentShader;
+	delete s_Data->PresentFragmentShader;
 
 	s_Data->CommandBuffers.clear();
 	s_Data->Fences.clear();
 	delete s_Data->GraphicsCommandManager;
 
-	for (auto& fb : s_Data->Framebuffers)
+	for (auto& fb : s_Data->PresentFramebuffers)
 		delete fb;
-	s_Data->Framebuffers.clear();
+	s_Data->PresentFramebuffers.clear();
 
 	delete s_Data->VertexBuffer;
 	delete s_Data->IndexBuffer;
@@ -299,13 +345,22 @@ void Renderer::DrawFrame(float ts)
 	pushData.model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
 	pushData.view_proj = proj * view;
 
-	s_Data->Pipeline->SetImageSampler(s_Data->Texture, 0, 0);
+	s_Data->DrawingPipeline->SetImageSampler(s_Data->Texture, 0, 0);
+	s_Data->PresentPipeline->SetImageSampler(s_Data->ColorImage, s_Data->ColorSampler, 0, 0);
 	cmd.Begin();
-	cmd.BeginGraphics(s_Data->Pipeline, *s_Data->Framebuffers[imageIndex]);
+
+	// Rendering
+	cmd.BeginGraphics(s_Data->DrawingPipeline);
 	cmd.SetGraphicsRootConstants(&pushData, nullptr);
 	cmd.DrawIndexed(s_Data->VertexBuffer, s_Data->IndexBuffer, (uint32_t)s_Data->Mesh->GetIndices().size(), 0, 0);
+	cmd.EndGraphics();
+
+	// Copying to present. Drawing UI
+	cmd.BeginGraphics(s_Data->PresentPipeline, *s_Data->PresentFramebuffers[imageIndex]);
+	cmd.Draw(6, 0);
 	EndImGui(&cmd);
 	cmd.EndGraphics();
+
 	cmd.End();
 
 	s_Data->GraphicsCommandManager->Submit(&cmd, 1, fence, imageAcquireSemaphore, 1, &semaphore, 1);
@@ -318,30 +373,35 @@ void Renderer::DrawImGui()
 {
 	ImGui::Begin("Params");
 	ImGui::DragFloat("Rotation speed", &s_Data->RotationSpeed, 0.05f, 0.0f, 5.f);
-	
-	VkSampler sampler = s_Data->Texture->GetSampler()->GetVulkanSampler();
-	VkImageView imageView = s_Data->Texture->GetImage()->GetVulkanImageView();
-	VkImageLayout layout = ImageLayoutToVulkan(s_Data->Texture->GetImage()->GetLayout());
+
+	VkSampler sampler = s_Data->ColorSampler->GetVulkanSampler();
+	VkImageView imageView = s_Data->ColorImage->GetVulkanImageView();
+	VkImageLayout layout = ImageLayoutToVulkan(ImageReadAccess::PixelShaderRead);
+	auto& size = s_Data->ColorImage->GetSize();
+	const float aspectRatio = float(size.x) / size.y;
 
 	const auto textureID = ImGui_ImplVulkan_AddTexture(sampler, imageView, layout);
 
-	ImGui::Image(textureID, { 256, 256 });
+	ImGui::Image(textureID, { 256.f * aspectRatio, 256.f });
 	ImGui::End();
 }
 
 void Renderer::OnWindowResized()
 {
-	for (auto& fb : s_Data->Framebuffers)
+	vkDeviceWaitIdle(VulkanContext::GetDevice()->GetVulkanDevice());
+	for (auto& fb : s_Data->PresentFramebuffers)
 		delete fb;
-	s_Data->Framebuffers.clear();
+	s_Data->PresentFramebuffers.clear();
 
 	auto& swapchainImages = s_Data->Swapchain->GetImages();
-	const void* renderPassHandle = s_Data->Pipeline->GetRenderPassHandle();
+	const void* renderPassHandle = s_Data->PresentPipeline->GetRenderPassHandle();
 	glm::uvec2 size = s_Data->Swapchain->GetSize();
 	s_Data->Size = size;
+	s_Data->ColorImage->Resize({ size, 1 });
 	s_Data->DepthImage->Resize({ size, 1 });
+	s_Data->DrawingPipeline->Resize(size.x, size.y);
 	for (auto& image : swapchainImages)
-		s_Data->Framebuffers.push_back(new VulkanFramebuffer({ image, s_Data->DepthImage }, renderPassHandle, size));
+		s_Data->PresentFramebuffers.push_back(new VulkanFramebuffer({ image }, renderPassHandle, size));
 }
 
 void Renderer::BeginImGui()
