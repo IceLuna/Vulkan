@@ -219,36 +219,22 @@ void VulkanShader::LoadBinary()
 
 	// Trying to find a cache for the shader
 	Path cachePath = Path(Renderer::GetRendererCachePath()) / "Shaders/Vulkan";
-	Path cacheFilePath = cachePath / (m_Path.filename().u8string() + ".bin");
+	Path cacheFilePath = cachePath / (m_Path.filename().u8string() + "_" + std::to_string(sourceHash) + ".bin");
 	bool bLoadedFromCache = false;
 	if (std::filesystem::exists(cacheFilePath))
 	{
-		// If cache exists, read it
+		bLoadedFromCache = true;
 		std::ifstream cacheFin(cacheFilePath, std::ios_base::binary);
 		std::stringstream cacheBuffer;
 		cacheBuffer << cacheFin.rdbuf();
 		cacheFin.close();
-		std::string cacheSource = cacheBuffer.str();
+		std::string cacheBinaryStr = cacheBuffer.str();
 
-		// Since first line of the cache-file is hash, find it and read it 
-		size_t newLinePos = cacheSource.find_first_of('\n');
-		std::string cacheHashStr = cacheSource.substr(0, newLinePos);
-		size_t cacheHash = 0;
-		std::stringstream converter(cacheHashStr);
-		converter >> cacheHash;
-
-		// Check if current shader hash matches the hash of the cache
-		if (sourceHash == cacheHash)
-		{
-			// Hashes are the same. Now we can read rest of the file (shader binary)
-			bLoadedFromCache = true;
-			std::string cacheBinaryStr = cacheSource.substr(newLinePos + 1);
-			size_t strBinarySize = cacheBinaryStr.size();
-			// Binary has uint32 type and string is char. So we divide caches size by 4
-			m_Binary.reserve(strBinarySize / 4);
-			for (size_t i = 0; i < strBinarySize; i += 4)
-				m_Binary.push_back(*(uint32_t*)&cacheBinaryStr[i]); // Reading 4 chars as uint32_t
-		}
+		size_t strBinarySize = cacheBinaryStr.size();
+		// Binary has uint32 type and string is char. So we divide caches size by 4
+		m_Binary.reserve(strBinarySize / 4);
+		for (size_t i = 0; i < strBinarySize; i += 4)
+			m_Binary.push_back(*(uint32_t*)&cacheBinaryStr[i]); // Reading 4 chars as uint32_t
 	}
 
 	if (!bLoadedFromCache)
@@ -274,9 +260,7 @@ void VulkanShader::LoadBinary()
 		if (!std::filesystem::exists(cachePath))
 			std::filesystem::create_directories(cachePath);
 
-		std::string sourceHashStr = std::to_string(sourceHash) + '\n';
 		std::ofstream out(cacheFilePath, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
-		out.write(sourceHashStr.c_str(), sourceHashStr.size());
 		out.write((const char*)m_Binary.data(), m_Binary.size() * sizeof(uint32_t));
 		out.close();
 	}
