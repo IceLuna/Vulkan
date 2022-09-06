@@ -16,7 +16,8 @@ void main()
     if (gidx.x >= g_width || gidx.y >= g_height)
         return;
 
-    vec4 inputColor = texture(u_Input, gidx / vec2(g_width, g_height));
+    vec2 uv = vec2(gidx) / vec2(g_width, g_height);
+    vec4 inputColor = texture(u_Input, uv);
     vec4 result = vec4(vec3(1.0) - inputColor.rgb, inputColor.a);
     imageStore(u_Output, gidx, result);
 }

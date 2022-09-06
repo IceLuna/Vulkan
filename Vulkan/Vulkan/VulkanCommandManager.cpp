@@ -180,7 +180,7 @@ void VulkanCommandBuffer::Dispatch(VulkanComputePipeline* pipeline, uint32_t num
 	{
 		auto& ranges = pipeline->m_State.ComputeShader->GetPushConstantRanges();
 		assert(ranges.size());
-		vkCmdPushConstants(m_CommandBuffer, pipeline->GetVulkanPipelineLayout(), ranges[0].stageFlags, ranges[0].offset, ranges[0].size, &pushConstants);
+		vkCmdPushConstants(m_CommandBuffer, pipeline->GetVulkanPipelineLayout(), ranges[0].stageFlags, ranges[0].offset, ranges[0].size, pushConstants);
 	}
 
 	vkCmdDispatch(m_CommandBuffer, numGroupsX, numGroupsY, numGroupsZ);

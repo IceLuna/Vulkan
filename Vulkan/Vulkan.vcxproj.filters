@@ -244,7 +244,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\basic.comp" />
+    <None Include="Shaders\invert_color.comp" />
     <None Include="Shaders\mesh.frag" />
     <None Include="Shaders\mesh.vert" />
     <None Include="Shaders\present.frag" />

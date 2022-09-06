@@ -29,21 +29,21 @@ inline VkImageLayout ImageLayoutToVulkan(ImageLayout imageLayout)
 	{
 		case ImageLayoutType::ReadOnly:
 		{
-			ImageReadAccess read_access_flags = imageLayout.ReadAccessFlags;
-			if (read_access_flags == ImageReadAccess::None)
+			ImageReadAccess readAccessFlags = imageLayout.ReadAccessFlags;
+			if (readAccessFlags == ImageReadAccess::None)
 			{
 				assert(!"Unknown read access");
 				return VK_IMAGE_LAYOUT_UNDEFINED;
 			}
-			if (HasFlags(ImageReadAccess::DepthStencilRead, read_access_flags))
+			if (HasFlags(ImageReadAccess::DepthStencilRead, readAccessFlags))
 			{
 				return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 			}
-			if (HasFlags(ImageReadAccess::PixelShaderRead | ImageReadAccess::NonPixelShaderRead, read_access_flags))
+			if (HasFlags(ImageReadAccess::PixelShaderRead | ImageReadAccess::NonPixelShaderRead, readAccessFlags))
 			{
 				return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			}
-			if (HasFlags(ImageReadAccess::CopySource, read_access_flags))
+			if (HasFlags(ImageReadAccess::CopySource, readAccessFlags))
 			{
 				return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 			}

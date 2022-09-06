@@ -163,7 +163,7 @@ void VulkanDescriptorManager::WriteDescriptors(const VulkanPipeline* pipeline, c
         writeData.DescriptorSetData->OnFlushed();
     }
 
-    vkUpdateDescriptorSets(s_Device, (uint32_t)writeDatas.size(), vkWriteDescriptorSets.data(), 0, nullptr);
+    vkUpdateDescriptorSets(s_Device, (uint32_t)vkWriteDescriptorSets.size(), vkWriteDescriptorSets.data(), 0, nullptr);
 }
 
 //-------------------

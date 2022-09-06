@@ -27,7 +27,7 @@ public:
 		ImageBinding(const VulkanImage* image, const VulkanSampler* sampler)
 			: Image(image->GetImage())
 			, View(image->GetVulkanImageView())
-			, Sampler(sampler->GetVulkanSampler()) {}
+			, Sampler(sampler ? sampler->GetVulkanSampler() : VK_NULL_HANDLE) {}
 		ImageBinding(const VulkanSampler* sampler) : Sampler(sampler->GetVulkanSampler()) {}
 
 		bool operator!=(const ImageBinding& other) const
