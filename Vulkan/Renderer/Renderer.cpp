@@ -35,12 +35,10 @@ struct Data
 	VulkanGraphicsPipeline* DrawingPipeline = nullptr;
 	VulkanGraphicsPipeline* PresentPipeline = nullptr;
 
-	VulkanCommandManager* ComputeCommandManager  = nullptr;
 	VulkanCommandManager* GraphicsCommandManager = nullptr;
 	VulkanSwapchain* Swapchain = nullptr;
 	std::vector<VulkanFramebuffer*> PresentFramebuffers;
 
-	std::vector<VulkanCommandBuffer> ComputeCommandBuffers;
 	std::vector<VulkanCommandBuffer> CommandBuffers;
 	std::vector<Ref<VulkanFence>> Fences;
 	std::array<VulkanSemaphore, MAX_FRAMES_IN_FLIGHT> Semaphores;
@@ -270,7 +268,6 @@ void Renderer::Init()
 	s_Data->Size = s_Data->Swapchain->GetSize();
 
 	s_Data->GraphicsCommandManager = new VulkanCommandManager(CommandQueueFamily::Graphics, true);
-	s_Data->ComputeCommandManager = new VulkanCommandManager(CommandQueueFamily::Compute, true);
 
 	SetupRenderingPipeline();
 	SetupPresentPipeline();
@@ -280,7 +277,6 @@ void Renderer::Init()
 	{
 		s_Data->Fences.push_back(MakeRef<VulkanFence>(true));
 		s_Data->CommandBuffers.emplace_back(s_Data->GraphicsCommandManager->AllocateCommandBuffer(false));
-		s_Data->ComputeCommandBuffers.emplace_back(s_Data->ComputeCommandManager->AllocateCommandBuffer(false));
 	}
 
 	s_Data->Mesh = new Mesh("Models/viking_room.obj");
@@ -325,11 +321,9 @@ void Renderer::Shutdown()
 	delete s_Data->MeshFragmentShader;
 	delete s_Data->PresentFragmentShader;
 
-	s_Data->ComputeCommandBuffers.clear();
 	s_Data->CommandBuffers.clear();
 	s_Data->Fences.clear();
 	delete s_Data->GraphicsCommandManager;
-	delete s_Data->ComputeCommandManager;
 
 	for (auto& fb : s_Data->PresentFramebuffers)
 		delete fb;
@@ -353,7 +347,6 @@ void Renderer::DrawFrame(float ts)
 	auto& semaphore = s_Data->Semaphores[s_CurrentFrame];
 	auto& fence = s_Data->Fences[s_CurrentFrame];
 	auto& cmd = s_Data->CommandBuffers[s_CurrentFrame];
-	auto& cmdCompute = s_Data->ComputeCommandBuffers[s_CurrentFrame];
 
 	fence->Wait();
 	fence->Reset();

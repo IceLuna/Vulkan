@@ -71,7 +71,15 @@ VulkanCommandManager::~VulkanCommandManager()
 
 VulkanCommandBuffer VulkanCommandManager::AllocateCommandBuffer(bool bBegin)
 {
-	VulkanCommandBuffer cmd(*this);
+	VulkanCommandBuffer cmd(*this, false);
+	if (bBegin)
+		cmd.Begin();
+	return cmd;
+}
+
+VulkanCommandBuffer VulkanCommandManager::AllocateSecondaryCommandbuffer(bool bBegin)
+{
+	VulkanCommandBuffer cmd(*this, true);
 	if (bBegin)
 		cmd.Begin();
 	return cmd;
@@ -136,7 +144,7 @@ void VulkanCommandManager::Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdB
 // COMMAND BUFFER
 //------------------
 
-VulkanCommandBuffer::VulkanCommandBuffer(const VulkanCommandManager& manager)
+VulkanCommandBuffer::VulkanCommandBuffer(const VulkanCommandManager& manager, bool bSecondary)
 {
 	m_Device = VulkanContext::GetDevice()->GetVulkanDevice();
 	m_CommandPool = manager.m_CommandPool;
@@ -146,7 +154,7 @@ VulkanCommandBuffer::VulkanCommandBuffer(const VulkanCommandManager& manager)
 	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	info.commandPool = m_CommandPool;
 	info.commandBufferCount = 1;
-	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	info.level = bSecondary ? VK_COMMAND_BUFFER_LEVEL_SECONDARY : VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
 	VK_CHECK(vkAllocateCommandBuffers(m_Device, &info, &m_CommandBuffer));
 }
@@ -291,6 +299,15 @@ void VulkanCommandBuffer::BeginGraphics(VulkanGraphicsPipeline* pipeline, const 
 void VulkanCommandBuffer::EndGraphics()
 {
 	assert(m_CurrentGraphicsPipeline);
+
+	auto& state = m_CurrentGraphicsPipeline->m_State;
+	for (auto& attachment : state.ColorAttachments)
+	{
+		if (attachment.Image)
+			attachment.Image->SetImageLayout(attachment.FinalLayout);
+	}
+	if (state.DepthStencilAttachment.Image)
+		state.DepthStencilAttachment.Image->SetImageLayout(state.DepthStencilAttachment.FinalLayout);
 
 	vkCmdEndRenderPass(m_CommandBuffer);
 	m_CurrentGraphicsPipeline = nullptr;

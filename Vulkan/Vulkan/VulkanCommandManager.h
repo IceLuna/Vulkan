@@ -52,6 +52,7 @@ public:
 	VkQueue GetVulkanQueue() const { return m_Queue; }
 
 	VulkanCommandBuffer AllocateCommandBuffer(bool bBegin = true);
+	VulkanCommandBuffer AllocateSecondaryCommandbuffer(bool bBegin = true);
 
 	void Submit(VulkanCommandBuffer* cmdBuffers, uint32_t cmdBuffersCount,
 		const Ref<VulkanFence>& signalFence,
@@ -73,7 +74,7 @@ private:
 class VulkanCommandBuffer
 {
 private:
-	VulkanCommandBuffer(const VulkanCommandManager& manager);
+	VulkanCommandBuffer(const VulkanCommandManager& manager, bool bSecondary);
 
 public:
 	VulkanCommandBuffer() = default;
