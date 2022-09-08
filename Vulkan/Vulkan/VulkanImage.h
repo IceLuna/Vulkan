@@ -5,6 +5,7 @@
 #include "../Renderer/RendererUtils.h"
 
 #include <unordered_map>
+#include <string>
 
 #include <glm/glm.hpp>
 
@@ -24,8 +25,8 @@ struct ImageSpecifications
 class VulkanImage
 {
 public:
-    VulkanImage(const ImageSpecifications& specs);
-    VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns);
+    VulkanImage(const ImageSpecifications& specs, const std::string& debugName = "");
+    VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns, const std::string& debugName = "");
     virtual ~VulkanImage();
 
     bool HasUsage(ImageUsage usage) const { return HasFlags(m_Specs.Usage, usage); }
@@ -69,6 +70,7 @@ private:
 private:
     mutable std::unordered_map<ImageView, VkImageView> m_Views; // Mutable by `GetVulkanImageView(const ImageView&)`
 
+    std::string m_DebugName;
     ImageSpecifications m_Specs;
     VkDevice m_Device = VK_NULL_HANDLE;
     VkImage m_Image = VK_NULL_HANDLE;

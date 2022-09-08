@@ -37,11 +37,6 @@ void VulkanPipeline::SetImageArray(const std::vector<const VulkanImage*>& images
 	m_DescriptorSetData[set].SetArgArray(binding, images, imageViews);
 }
 
-void VulkanPipeline::SetSampler(const VulkanSampler* sampler, uint32_t set, uint32_t binding)
-{
-	m_DescriptorSetData[set].SetArg(binding, sampler);
-}
-
 void VulkanPipeline::SetImageSampler(const VulkanImage* image, const VulkanSampler* sampler, uint32_t set, uint32_t binding)
 {
 	m_DescriptorSetData[set].SetArg(binding, image, sampler);

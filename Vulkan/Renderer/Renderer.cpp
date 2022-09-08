@@ -179,14 +179,14 @@ static void SetupRenderingPipeline()
 	depthSpecs.Layout = ImageLayoutType::DepthStencilWrite;
 	depthSpecs.Size = { s_Data->Size.x, s_Data->Size.y, 1 };
 	depthSpecs.Usage = ImageUsage::DepthStencilAttachment;
-	s_Data->DepthImage = new VulkanImage(depthSpecs);
+	s_Data->DepthImage = new VulkanImage(depthSpecs, "DepthImage");
 
 	ImageSpecifications colorSpecs;
 	colorSpecs.Format = ImageFormat::R8G8B8A8_UNorm;
 	colorSpecs.Layout = ImageLayoutType::RenderTarget;
 	colorSpecs.Size = { s_Data->Size.x, s_Data->Size.y, 1 };
 	colorSpecs.Usage = ImageUsage::ColorAttachment | ImageUsage::Sampled;
-	s_Data->ColorImage = new VulkanImage(colorSpecs);
+	s_Data->ColorImage = new VulkanImage(colorSpecs, "ColorImage");
 
 	ColorAttachment colorAttachment;
 	colorAttachment.Image = s_Data->ColorImage;
@@ -254,7 +254,7 @@ static void SetupComputePipeline()
 	imageSpecs.Layout = ImageLayoutType::StorageImage;
 	imageSpecs.Size = { s_Data->Size.x, s_Data->Size.y, 1 };
 	imageSpecs.Usage = ImageUsage::Sampled | ImageUsage::Storage;
-	s_Data->InvertedColorImage = new VulkanImage(imageSpecs);
+	s_Data->InvertedColorImage = new VulkanImage(imageSpecs, "InvertedColorImage");
 }
 
 void Renderer::Init()
@@ -287,8 +287,8 @@ void Renderer::Init()
 
 	BufferSpecifications vertexSpecs { vertices.size() * sizeof(Vertex),  MemoryType::Gpu, BufferUsage::VertexBuffer | BufferUsage::TransferDst};
 	BufferSpecifications indexSpecs  { indices.size() * sizeof(uint32_t), MemoryType::Gpu, BufferUsage::IndexBuffer  | BufferUsage::TransferDst};
-	s_Data->VertexBuffer = new VulkanBuffer(vertexSpecs);
-	s_Data->IndexBuffer  = new VulkanBuffer(indexSpecs);
+	s_Data->VertexBuffer = new VulkanBuffer(vertexSpecs, "VertexBuffer");
+	s_Data->IndexBuffer  = new VulkanBuffer(indexSpecs, "IndexBuffer");
 
 	Ref<VulkanFence> writeBuffersFence = MakeRef<VulkanFence>();
 	auto cmd = s_Data->GraphicsCommandManager->AllocateCommandBuffer();

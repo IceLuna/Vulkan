@@ -192,8 +192,10 @@ void VulkanSwapchain::RecreateSwapchain()
 		delete image;
 	m_Images.clear();
 
+	const std::string debugName = "SwapchainImage";
+	int i = 0;
 	for (auto& image : vkImages)
-		m_Images.push_back(new VulkanImage(image, specs, false));
+		m_Images.push_back(new VulkanImage(image, specs, false, debugName + std::to_string(i++)));
 }
 
 void VulkanSwapchain::CreateSyncObjects()

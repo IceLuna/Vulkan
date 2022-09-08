@@ -50,7 +50,7 @@ VulkanTexture2D::VulkanTexture2D(const Path& path, const Texture2DSpecifications
 		imageSpecs.Layout = ImageLayoutType::CopyDest; // Since we're about to write texture data to it
 		imageSpecs.SamplesCount = m_Specs.SamplesCount;
 		imageSpecs.MipsCount =  mipsCount;
-		m_Image = new VulkanImage(imageSpecs);
+		m_Image = new VulkanImage(imageSpecs, m_Path.filename().u8string());
 
 		Ref<VulkanFence> writeFence = MakeRef<VulkanFence>();
 		auto cmdManager = Renderer::GetGraphicsCommandManager();

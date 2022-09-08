@@ -13,7 +13,61 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
 	VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData)
 {
-	std::cout << pCallbackData->pMessage;
+	std::cout << pCallbackData->pMessage << '\n';
+
+	// Parse for image handle
+	{
+		static const char* s_ImagePrefixes[] = { "using image (", "use image ", "expects image ", "of VkImage (", "For image " , "with image " };
+		const char* imageHandleStr = nullptr;
+		for (const char* prefix : s_ImagePrefixes)
+		{
+			imageHandleStr = strstr(pCallbackData->pMessage, prefix);
+			if (imageHandleStr != nullptr)
+			{
+				// Found handle
+				imageHandleStr += strlen(prefix);
+
+				uint64_t imageHandle = uint64_t(-1);
+				sscanf_s(imageHandleStr, "%zu", &imageHandle);
+
+				VkImage image = (VkImage)(imageHandle);
+				std::string imageName = VulkanContext::GetResourceDebugName(image);
+
+				if (!imageName.empty())
+				{
+					std::cout << "Image in question: id = " << imageHandle << ", name = " << imageName << '\n';
+					break;
+				}
+			}
+		}
+	}
+	// Parse for buffer handle
+	{
+		static const char* s_BufferPrefixes[] = { "buffer ", "bound Buffer ", "Buffer (" };
+		const char* bufferHandleStr = nullptr;
+		for (const char* prefix : s_BufferPrefixes)
+		{
+			bufferHandleStr = strstr(pCallbackData->pMessage, prefix);
+			if (bufferHandleStr != nullptr)
+			{
+				// Found handle
+				bufferHandleStr += strlen(prefix);
+
+				uint64_t bufferHandle = uint64_t(-1);
+				sscanf_s(bufferHandleStr, "%zu", &bufferHandle);
+
+				VkBuffer buffer = (VkBuffer)(bufferHandle);
+				std::string bufferName = VulkanContext::GetResourceDebugName(buffer);
+
+				if (!bufferName.empty())
+				{
+					std::cout << "Buffer in question: id = " << bufferHandle << ", name = " << bufferName << '\n';
+					break;
+				}
+			}
+		}
+	}
+
 	return VK_FALSE; //To not abort caller
 }
 
@@ -164,4 +218,11 @@ void VulkanContext::InitDevices(VkSurfaceKHR surface, bool bRequireSurface)
 	VkPhysicalDeviceFeatures features{};
 	features.wideLines = VK_TRUE;
 	m_Device = VulkanDevice::Create(m_PhysicalDevice, features);
+
+	InitFunctions();
+}
+
+void VulkanContext::InitFunctions()
+{
+	m_Functions.setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(void*)vkGetDeviceProcAddr(m_Device->GetVulkanDevice(), "vkSetDebugUtilsObjectNameEXT");
 }

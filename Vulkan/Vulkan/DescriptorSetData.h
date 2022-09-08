@@ -19,7 +19,6 @@ public:
 		ImageBinding() = default;
 		ImageBinding(const VulkanImage* image) : Image(image->GetImage()), View(image->GetVulkanImageView()) {}
 		ImageBinding(const VulkanImage* image, const ImageView& view) : Image(image->GetImage()), View(image->GetVulkanImageView(view)) {}
-		ImageBinding(VkImageView view) : View(view) {}
 		ImageBinding(const VulkanImage* image, const ImageView& view, const VulkanSampler* sampler)
 			: Image(image->GetImage())
 			, View(image->GetVulkanImageView(view))
@@ -28,7 +27,6 @@ public:
 			: Image(image->GetImage())
 			, View(image->GetVulkanImageView())
 			, Sampler(sampler ? sampler->GetVulkanSampler() : VK_NULL_HANDLE) {}
-		ImageBinding(const VulkanSampler* sampler) : Sampler(sampler->GetVulkanSampler()) {}
 
 		bool operator!=(const ImageBinding& other) const
 		{
@@ -98,7 +96,6 @@ public:
 	void SetArgArray(std::uint32_t idx, const std::vector<const VulkanImage*>& images);
 	void SetArgArray(std::uint32_t idx, const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews);
 
-	void SetArg(std::uint32_t idx, const VulkanSampler* sampler);
 	void SetArg(std::uint32_t idx, const VulkanImage* image, const VulkanSampler* sampler);
 	void SetArg(std::uint32_t idx, const VulkanImage* image, const ImageView& imageView, const VulkanSampler* sampler);
 	void SetArgArray(std::uint32_t idx, const std::vector<const VulkanImage*>& images, const std::vector<const VulkanSampler*>& samplers);

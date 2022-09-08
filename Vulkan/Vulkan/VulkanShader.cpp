@@ -198,6 +198,42 @@ void VulkanShader::Reload()
 	CreateShaderModule();
 }
 
+static void ParseIncludes(std::string& source)
+{
+	const Path cachePath = "Shaders/";
+	const std::string include = "#include ";
+	const size_t includeSize = include.size();
+	std::stringstream buffer;
+
+	size_t pos = source.find(include);
+	while (pos != std::string::npos)
+	{
+		size_t endLinePos = source.find_first_of('\n', pos);
+
+		size_t offset = pos + includeSize + 1;
+		std::string filename = source.substr(offset, endLinePos - offset - 1);
+		const Path path = cachePath / filename;
+
+		std::ifstream fin(path);
+		if (!fin)
+		{
+			std::cout << "Failed to open shader file: " << path << std::endl;
+			return;
+		}
+
+		// Adding defines and reading shader code from the file
+		buffer << "// Include file: " << filename << '\n';
+		buffer << fin.rdbuf();
+		fin.close();
+		std::string includeSource = buffer.str();
+		source.replace(pos, endLinePos - pos + 1, includeSource);
+
+		buffer.str(std::string(""));
+		buffer.clear();
+		pos = source.find("#include ");
+	}
+}
+
 void VulkanShader::LoadBinary()
 {
 	std::ifstream fin(m_Path);
@@ -215,6 +251,7 @@ void VulkanShader::LoadBinary()
 	buffer << fin.rdbuf();
 	fin.close();
 	std::string source = buffer.str();
+	ParseIncludes(source);
 	const size_t sourceHash = std::hash<std::string>()(source);
 
 	// Trying to find a cache for the shader

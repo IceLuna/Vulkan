@@ -3,6 +3,8 @@
 #include "../Renderer/RendererUtils.h"
 #include "VulkanAllocator.h"
 
+#include <string>
+
 struct BufferSpecifications
 {
 	size_t Size = 0;
@@ -13,7 +15,7 @@ struct BufferSpecifications
 class VulkanBuffer
 {
 public:
-	VulkanBuffer(const BufferSpecifications& specs);
+	VulkanBuffer(const BufferSpecifications& specs, const std::string& debugName = "");
 	VulkanBuffer(VulkanBuffer&& other) noexcept
 	{
 		m_Specs = other.m_Specs;
@@ -30,20 +32,7 @@ public:
 		Release();
 	}
 
-	VulkanBuffer& operator=(VulkanBuffer&& other) noexcept
-	{
-		Release();
-
-		m_Specs = other.m_Specs;
-		m_Buffer = other.m_Buffer;
-		m_Allocation = other.m_Allocation;
-
-		other.m_Specs = {};
-		other.m_Buffer = VK_NULL_HANDLE;
-		other.m_Allocation = VK_NULL_HANDLE;
-
-		return *this;
-	}
+	VulkanBuffer& operator=(VulkanBuffer&& other) noexcept;
 
 	[[nodiscard]] void* Map()
 	{
@@ -66,16 +55,10 @@ public:
 	VkBuffer GetVulkanBuffer() const { return m_Buffer; }
 
 private:
-	void Release()
-	{
-		if (m_Buffer)
-			VulkanAllocator::DestroyBuffer(m_Buffer, m_Allocation);
-
-		m_Buffer = VK_NULL_HANDLE;
-		m_Allocation = VK_NULL_HANDLE;
-	}
+	void Release();
 
 private:
+	std::string m_DebugName;
 	BufferSpecifications m_Specs;
 	VkBuffer m_Buffer = VK_NULL_HANDLE;
 	VmaAllocation m_Allocation = VK_NULL_HANDLE;

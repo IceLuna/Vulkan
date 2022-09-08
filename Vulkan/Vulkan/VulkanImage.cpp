@@ -6,7 +6,9 @@
 
 #include "../Renderer/Renderer.h"
 
-VulkanImage::VulkanImage(const ImageSpecifications& specs) : m_Specs(specs)
+VulkanImage::VulkanImage(const ImageSpecifications& specs, const std::string& debugName)
+	: m_DebugName(debugName)
+	, m_Specs(specs)
 {
 	assert(specs.Size.x > 0 && specs.Size.y > 0);
 
@@ -26,8 +28,9 @@ VulkanImage::VulkanImage(const ImageSpecifications& specs) : m_Specs(specs)
 	}
 }
 
-VulkanImage::VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns)
-	: m_Specs(specs)
+VulkanImage::VulkanImage(VkImage vulkanImage, const ImageSpecifications& specs, bool bOwns, const std::string& debugName)
+	: m_DebugName(debugName)
+	, m_Specs(specs)
 	, m_Image(vulkanImage)
 	, m_bOwns(bOwns)
 {
@@ -56,6 +59,7 @@ VkImageAspectFlags VulkanImage::GetTransitionAspectMask(ImageLayout oldLayout, I
 void VulkanImage::CreateImage()
 {
 	assert(m_bOwns);
+	assert(m_Image == VK_NULL_HANDLE);
 
 	m_VulkanFormat = ImageFormatToVulkan(m_Specs.Format);
 	m_AspectMask = GetImageAspectFlags(m_VulkanFormat);
@@ -80,17 +84,28 @@ void VulkanImage::CreateImage()
 	// Workarounding the issue by allocating each VkImage in its own VkDeviceMemory, so that mapping buffers can't result in mapping memory bound to VkImage.
 	constexpr bool separateAllocation = true;
 	m_Allocation = VulkanAllocator::AllocateImage(&info, m_Specs.MemoryType, separateAllocation, &m_Image);
+	
+	if (!m_DebugName.empty())
+		VulkanContext::AddResourceDebugName(m_Image, m_DebugName, VK_OBJECT_TYPE_IMAGE);
 }
 
 void VulkanImage::ReleaseImage()
 {
-	if (m_bOwns && m_Image)
-		VulkanAllocator::DestroyImage(m_Image, m_Allocation);
+	if (m_Image)
+	{
+		if (!m_DebugName.empty())
+			VulkanContext::RemoveResourceDebugName(m_Image);
+
+		if (m_bOwns)
+			VulkanAllocator::DestroyImage(m_Image, m_Allocation);
+	}
+
+	m_Image = VK_NULL_HANDLE;
 }
 
 void VulkanImage::CreateImageView()
 {
-	ReleaseImageView();
+	assert(m_DefaultImageView == VK_NULL_HANDLE);
 	m_DefaultImageView = GetVulkanImageView({ 0, m_Specs.MipsCount, 0 });
 }
 

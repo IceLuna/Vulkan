@@ -58,18 +58,6 @@ void DescriptorSetData::SetArg(std::uint32_t idx, const VulkanImage* image, cons
     }
 }
 
-void DescriptorSetData::SetArg(std::uint32_t idx, const VulkanSampler* sampler)
-{
-    auto& currentBinding = m_Bindings[idx];
-
-    ImageBinding binding(sampler);
-    if (currentBinding.ImageBindings[0] != binding)
-    {
-        currentBinding.ImageBindings[0] = binding;
-        m_bDirty = true;
-    }
-}
-
 void DescriptorSetData::SetArgArray(std::uint32_t idx, const std::vector<const VulkanBuffer*>& buffers)
 {
     assert(buffers.size());

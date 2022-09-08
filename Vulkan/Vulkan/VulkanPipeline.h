@@ -33,7 +33,6 @@ public:
 	void SetImageArray(const std::vector<const VulkanImage*>& images, uint32_t set, uint32_t binding);
 	void SetImageArray(const std::vector<const VulkanImage*>& images, const std::vector<ImageView>& imageViews, uint32_t set, uint32_t binding);
 
-	void SetSampler(const VulkanSampler* sampler, uint32_t set, uint32_t binding);
 	void SetImageSampler(const VulkanImage* image, const VulkanSampler* sampler, uint32_t set, uint32_t binding);
 	void SetImageSampler(const VulkanTexture2D* texture, uint32_t set, uint32_t binding);
 	void SetImageSampler(const VulkanTexture2D* texture, const ImageView& imageView, uint32_t set, uint32_t binding);
