@@ -125,6 +125,8 @@ public:
 	void BeginGraphics(VulkanGraphicsPipeline* pipeline, const VulkanFramebuffer& framebuffer);
 	void EndGraphics();
 	void Draw(uint32_t vertexCount, uint32_t firstVertex);
+	void DrawIndexedInstanced(const VulkanBuffer* vertexBuffer, const VulkanBuffer* indexBuffer, uint32_t indexCount, uint32_t firstIndex, int32_t vertexOffset,
+		uint32_t instanceCount, uint32_t firstInstance, const VulkanBuffer* perInstanceBuffer);
 	void DrawIndexed(const VulkanBuffer* vertexBuffer, const VulkanBuffer* indexBuffer, uint32_t indexCount, uint32_t firstIndex, uint32_t vertexOffset);
 
 	void SetGraphicsRootConstants(const void* vertexRootConstants, const void* fragmentRootConstants);

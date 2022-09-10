@@ -325,11 +325,16 @@ void VulkanShader::Reflect(const std::vector<uint32_t>& binary)
 
 			uint32_t size = (type.width / 8) * type.vecsize;
 
-			auto& attrib = m_VertexAttribs.emplace_back();
-			attrib.binding = 0;
-			attrib.location = glsl.get_decoration(input.id, spv::DecorationLocation);
-			attrib.offset = size;
-			attrib.format = Utils::GLSLTypeToVulkan(type);
+			uint32_t location = glsl.get_decoration(input.id, spv::DecorationLocation);
+			VkFormat vkType = Utils::GLSLTypeToVulkan(type);
+			for (uint32_t i = 0; i < type.columns; ++i)
+			{
+				auto& attrib = m_VertexAttribs.emplace_back();
+				attrib.binding = 0;
+				attrib.location = location + i;
+				attrib.offset = size;
+				attrib.format = vkType;
+			}
 		}
 	}
 	

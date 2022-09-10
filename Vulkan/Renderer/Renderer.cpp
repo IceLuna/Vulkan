@@ -29,6 +29,11 @@
 static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
 static uint32_t s_CurrentFrame = 0;
 
+struct PerInstanceData
+{
+	glm::mat4 Model;
+};
+
 struct Data
 {
 	VulkanComputePipeline*  ComputePipeline = nullptr;
@@ -56,14 +61,18 @@ struct Data
 	VulkanSampler* ColorSampler = nullptr;
 	VulkanImage* DepthImage = nullptr;
 
-	glm::vec3 ModelPosition = glm::vec3(0.f);
+	glm::vec3 ModelPosition = glm::vec3(0.7f, 0.f, 0.7f);
 	glm::uvec2 Size = {800, 600};
 
 	Mesh* Mesh = nullptr;
 	VulkanTexture2D* Texture = nullptr;
 	VulkanBuffer* VertexBuffer = nullptr;
+	VulkanBuffer* InstanceBuffer = nullptr;
 	VulkanBuffer* IndexBuffer = nullptr;
 	float RotationSpeed = 0.5f;
+
+	static constexpr uint32_t s_InstanceCount = 10;
+	PerInstanceData InstanceData[s_InstanceCount];
 };
 
 struct ImGuiData
@@ -209,6 +218,7 @@ static void SetupRenderingPipeline()
 	state.FragmentShader = s_Data->MeshFragmentShader;
 	state.ColorAttachments.push_back(colorAttachment);
 	state.DepthStencilAttachment = depthAttachment;
+	state.PerInstanceAttribs = { { 2 }, { 3 }, { 4 }, { 5 } }; // Locations of Per-Instance data in shader
 	state.CullMode = CullMode::None;
 
 	s_Data->DrawingPipeline = new VulkanGraphicsPipeline(state);
@@ -285,9 +295,11 @@ void Renderer::Init()
 	auto& vertices = s_Data->Mesh->GetVertices();
 	auto& indices = s_Data->Mesh->GetIndices();
 
-	BufferSpecifications vertexSpecs { vertices.size() * sizeof(Vertex),  MemoryType::Gpu, BufferUsage::VertexBuffer | BufferUsage::TransferDst};
-	BufferSpecifications indexSpecs  { indices.size() * sizeof(uint32_t), MemoryType::Gpu, BufferUsage::IndexBuffer  | BufferUsage::TransferDst};
+	BufferSpecifications vertexSpecs   { vertices.size() * sizeof(Vertex),  MemoryType::Gpu, BufferUsage::VertexBuffer | BufferUsage::TransferDst};
+	BufferSpecifications instanceSpecs { sizeof(s_Data->InstanceData),      MemoryType::Gpu, BufferUsage::VertexBuffer | BufferUsage::TransferDst};
+	BufferSpecifications indexSpecs    { indices.size() * sizeof(uint32_t), MemoryType::Gpu, BufferUsage::IndexBuffer  | BufferUsage::TransferDst};
 	s_Data->VertexBuffer = new VulkanBuffer(vertexSpecs, "VertexBuffer");
+	s_Data->InstanceBuffer = new VulkanBuffer(instanceSpecs, "InstanceBuffer");
 	s_Data->IndexBuffer  = new VulkanBuffer(indexSpecs, "IndexBuffer");
 
 	Ref<VulkanFence> writeBuffersFence = MakeRef<VulkanFence>();
@@ -330,6 +342,7 @@ void Renderer::Shutdown()
 	s_Data->PresentFramebuffers.clear();
 
 	delete s_Data->VertexBuffer;
+	delete s_Data->InstanceBuffer;
 	delete s_Data->IndexBuffer;
 	delete s_Data->Mesh;
 	delete s_Data->Texture;
@@ -359,7 +372,6 @@ void Renderer::DrawFrame(float ts)
 
 	struct PushConstant
 	{
-		glm::mat4 model;
 		glm::mat4 view_proj;
 	} pushData;
 
@@ -369,14 +381,25 @@ void Renderer::DrawFrame(float ts)
 		uint32_t Height;
 	} computePushData;
 
-	glm::mat4 view = glm::lookAt(glm::vec3(2.f), glm::vec3(0.f), glm::vec3(0, 0, 1));
+	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 2.f, 0.f), glm::vec3(0.f), glm::vec3(0, 0, 1));
 	glm::mat4 proj = glm::perspective(glm::radians(45.f), float(s_Data->Size.x) / s_Data->Size.y, 0.1f, 10.f);
 	proj[1][1] *= -1;
+	pushData.view_proj = proj * view;
 
 	static float angle = 0.f;
 	angle += s_Data->RotationSpeed * ts * glm::radians(90.0f);
-	pushData.model = glm::translate(glm::mat4(1.f), s_Data->ModelPosition) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
-	pushData.view_proj = proj * view;
+
+#pragma omp parallel for
+	for (int32_t i = 0; i < int(s_Data->s_InstanceCount); ++i)
+	{
+		glm::mat4 result = glm::mat4(1.f);
+		glm::vec3 posOffset = glm::vec3(float(i) * (-0.15f), 0.f, float(i) * (-0.15f));
+		result = glm::translate(result, s_Data->ModelPosition + posOffset);
+		result = glm::rotate(result, angle, glm::vec3(0.0f, 0.0f, 1.0f));
+		result = glm::scale(result, glm::vec3(0.1f));
+
+		s_Data->InstanceData[i].Model = result;
+	}
 
 	computePushData.Width  = s_Data->Size.x;
 	computePushData.Height = s_Data->Size.y;
@@ -387,10 +410,13 @@ void Renderer::DrawFrame(float ts)
 	s_Data->ComputePipeline->SetImage(s_Data->InvertedColorImage, 0, 1);
 	cmd.Begin();
 
+	// Update per instance buffer
+	cmd.Write(s_Data->InstanceBuffer, s_Data->InstanceData, sizeof(s_Data->InstanceData), 0, BufferLayoutType::Unknown, BufferReadAccess::Vertex);
+
 	// Rendering
 	cmd.BeginGraphics(s_Data->DrawingPipeline);
 	cmd.SetGraphicsRootConstants(&pushData, nullptr);
-	cmd.DrawIndexed(s_Data->VertexBuffer, s_Data->IndexBuffer, (uint32_t)s_Data->Mesh->GetIndices().size(), 0, 0);
+	cmd.DrawIndexedInstanced(s_Data->VertexBuffer, s_Data->IndexBuffer, (uint32_t)s_Data->Mesh->GetIndices().size(), 0, 0, s_Data->s_InstanceCount, 0, s_Data->InstanceBuffer);
 	cmd.EndGraphics();
 
 	cmd.TransitionLayout(s_Data->ColorImage, ImageReadAccess::PixelShaderRead, ImageReadAccess::PixelShaderRead);

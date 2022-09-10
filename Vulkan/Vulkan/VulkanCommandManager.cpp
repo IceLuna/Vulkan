@@ -315,12 +315,32 @@ void VulkanCommandBuffer::EndGraphics()
 
 void VulkanCommandBuffer::Draw(uint32_t vertexCount, uint32_t firstVertex)
 {
+	assert(m_CurrentGraphicsPipeline);
+
 	CommitDescriptors(m_CurrentGraphicsPipeline, VK_PIPELINE_BIND_POINT_GRAPHICS);
 	vkCmdDraw(m_CommandBuffer, vertexCount, 1, firstVertex, 0);
 }
 
+void VulkanCommandBuffer::DrawIndexedInstanced(const VulkanBuffer* vertexBuffer, const VulkanBuffer* indexBuffer, uint32_t indexCount, uint32_t firstIndex, int32_t vertexOffset,
+	uint32_t instanceCount, uint32_t firstInstance, const VulkanBuffer* perInstanceBuffer)
+{
+	assert(m_CurrentGraphicsPipeline);
+	assert(vertexBuffer->HasUsage(BufferUsage::VertexBuffer));
+	assert(perInstanceBuffer->HasUsage(BufferUsage::VertexBuffer));
+	assert(indexBuffer->HasUsage(BufferUsage::IndexBuffer));
+
+	CommitDescriptors(m_CurrentGraphicsPipeline, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
+	VkBuffer vertexBuffers[2] = { vertexBuffer->GetVulkanBuffer(), perInstanceBuffer->GetVulkanBuffer() };
+	VkDeviceSize offsets[] = { 0, 0 };
+	vkCmdBindVertexBuffers(m_CommandBuffer, 0, 2, vertexBuffers, offsets);
+	vkCmdBindIndexBuffer(m_CommandBuffer, indexBuffer->GetVulkanBuffer(), 0, VK_INDEX_TYPE_UINT32);
+	vkCmdDrawIndexed(m_CommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
+
 void VulkanCommandBuffer::DrawIndexed(const VulkanBuffer* vertexBuffer, const VulkanBuffer* indexBuffer, uint32_t indexCount, uint32_t firstIndex, uint32_t vertexOffset)
 {
+	assert(m_CurrentGraphicsPipeline);
 	assert(vertexBuffer->HasUsage(BufferUsage::VertexBuffer));
 	assert(indexBuffer->HasUsage(BufferUsage::IndexBuffer));
 	CommitDescriptors(m_CurrentGraphicsPipeline, VK_PIPELINE_BIND_POINT_GRAPHICS);

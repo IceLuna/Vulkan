@@ -405,6 +405,7 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineState& stat
 			attrib.offset = vertexInputBindings[attrib.binding].stride;
 			vertexInputBindings[attrib.binding].stride += size;
 		}
+
 		vertexInput.vertexBindingDescriptionCount = state.PerInstanceAttribs.empty() ? 1 : 2;
 		vertexInput.pVertexBindingDescriptions = vertexInputBindings.data();
 		vertexInput.vertexAttributeDescriptionCount = (uint32_t)vertexAttribs.size();
