@@ -389,7 +389,6 @@ void Renderer::DrawFrame(float ts)
 	static float angle = 0.f;
 	angle += s_Data->RotationSpeed * ts * glm::radians(90.0f);
 
-#pragma omp parallel for
 	for (int32_t i = 0; i < int(s_Data->s_InstanceCount); ++i)
 	{
 		glm::mat4 result = glm::mat4(1.f);
